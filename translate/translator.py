@@ -103,7 +103,7 @@ class TranslatorLLM(Translator):
     """
     llm_data: dict
 
-    def __init__(self, min_length: int = 0, max_length: int = 1000, rate_limit: str = "",
+    def __init__(self, min_length: int = 0, max_length: int = 1000, rate_limit: str = "10/s",
                  llm_info: dict = None) -> None:
         if llm_info is None:
             llm_info = {}
