@@ -3,3 +3,4 @@
 /logs
 test.*
 *.log
+/translate/__pycache__

@@ -46,6 +46,7 @@ class WorkshopNewMods:
                     mod_id = mod_text.split('&')[0]
                     if mod_id not in self.ids:
                         self.ids.append(mod_id)
+            self.ids.sort()
         for i in range(1, depth + 1):
             url = (f'https://steamcommunity.com/workshop/browse/'
                    f'?appid={self.game_id}&browsesort=mostrecent'
@@ -62,7 +63,7 @@ class WorkshopNewMods:
 
 if __name__ == '__main__':
     import python_ta
-    python_ta.check_all(config={'disable': ['E9999', 'W1203']})
+    python_ta.check_all(config={'disable': ['E9999', 'W1203'], "max-line-length": 120})
 
     fetcher = WorkshopNewMods(107410)
     fetcher.get_mods(3)

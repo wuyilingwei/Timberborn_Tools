@@ -39,3 +39,7 @@ class CSV_File:
     def get_data(self) -> dict[str, list]:
         # Add your implementation here
         pass
+
+if __name__ == '__main__':
+    import python_ta
+    python_ta.check_all(config={'disable': ['E9999', 'W1203'], "max-line-length": 120})
