@@ -1,5 +1,6 @@
 from workshop import WorkshopNewMods
 from translator import Translator, LLMTranslator, GoogleTranslator
+import logging
 import argparse
 
 parser = argparse.ArgumentParser()
