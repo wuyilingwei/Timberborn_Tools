@@ -1,4 +1,6 @@
 """
+version: 0.1.0
+author: Wuyilingwei
 Get the latest mods from the Steam Workshop
 """
 import logging

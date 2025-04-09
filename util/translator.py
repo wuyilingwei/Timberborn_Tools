@@ -1,4 +1,6 @@
 """
+version: 0.1.0
+author: Wuyilingwei
 This module provides class of translators
 Support Google Translator and OPENAI-STYLED LLM API Translator
 """
@@ -29,9 +31,9 @@ class Translator:
         self.rate_limit = rate_limit
         self.request_history = []
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.parse_rate_limit()
+        self._parse_rate_limit()
 
-    def parse_rate_limit(self) -> None:
+    def _parse_rate_limit(self) -> None:
         """
         Parse the rate limit string into number and unit
         """
@@ -50,7 +52,7 @@ class Translator:
             self.rate_limit_num = None
             self.rate_limit_seconds = None
 
-    def check_rate_limit(self) -> None:
+    def _check_rate_limit(self) -> None:
         """
         Check if the rate limit is exceeded
         """
@@ -70,17 +72,24 @@ class Translator:
         """
         raise NotImplementedError
 
+    def get_price(self) -> float:
+        """
+        Calculate the usage cost of the translator
+        """
+        raise NotImplementedError
+
 
 class TranslatorGoogle(Translator):
     """
     Google Translator
+    THIS CLASS COULD NOT WORK
     """
     def __init__(self, min_length: int = 0, max_length: int = 1000, rate_limit: str = "10/s") -> None:
         super().__init__(min_length, max_length, rate_limit)
 
     def translate(self, text: str, aim: str) -> dict:
         self.logger.info(f"Translating text: {text}")
-        self.check_rate_limit()
+        self._check_rate_limit()
         self.request_history.append(time.time())
         if text == "":
             self.logger.warning("Empty text")
@@ -96,6 +105,13 @@ class TranslatorGoogle(Translator):
             self.logger.error(f"Translation failed: {e}")
             return {"text": "Failed", "code": -1}
 
+    def get_price(self) -> float:
+        """
+        Calculate the usage cost of the translator
+        """
+        # Google Translator does not provide a usage cost
+        return 0.0
+
 
 class TranslatorLLM(Translator):
     """
@@ -108,11 +124,11 @@ class TranslatorLLM(Translator):
         if llm_info is None:
             llm_info = {}
         self.llm_data = {
-            "api": llm_info.get("api", "https://api.openai.com/v1/completions"),
+            "api": llm_info.get("api", "https://api.openai.com/v1/chat/completions"),
             "token": llm_info.get("token", ""),
-            "model": llm_info.get("model", ""),
+            "model": llm_info.get("model", "gpt-4o-mini-2024-07-18"),
             "prompt": llm_info.get("prompt", "You are a helpful assistant that helps people with translation."
-                                   "Translate the following text to {language}:"),
+                                   "Translate the given text to {language} (Language Code) and only return the translated text."),
             "input_price": llm_info.get("input_price", 0.0),
             "output_price": llm_info.get("output_price", 0.0),
             "input_token": 0,
@@ -121,7 +137,9 @@ class TranslatorLLM(Translator):
         super().__init__(min_length, max_length, rate_limit)
 
     def translate(self, text: str, aim: str) -> dict:
-        self.check_rate_limit()
+        if self.llm_data["token"] == "":
+            raise ValueError("API token is required")
+        self._check_rate_limit()
         self.request_history.append(time.time())
         if text == "":
             self.logger.warning("Empty text")
@@ -150,6 +168,8 @@ class TranslatorLLM(Translator):
         }
 
         try:
+            self.logger.debug(headers)
+            self.logger.debug(data)
             response = requests.post(self.llm_data["api"], headers=headers, data=json.dumps(data))
             response_data = response.json()
             if 'usage' in response_data:

@@ -1,5 +1,7 @@
-from workshop import WorkshopNewMods
-from translator import Translator, LLMTranslator, GoogleTranslator
+from util.workshop import *
+from util.translator import *
+from util.config import *
+from util.file import *
 import logging
 import argparse
 
