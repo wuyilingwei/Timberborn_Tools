@@ -72,9 +72,9 @@ for id in config["workshop"]["ids"]:
         file.save_data(data_path, f"{id}_{support_version}")
         if support_version == "default":
             for game_version in config["game"]["versions"]:
-                file.save_result(os.path.join(result_path, game_version))
+                file.save_result(os.path.join(result_path, game_version, "Localizations"))
         else:
-            file.save_result(os.path.join(result_path, support_version))
+            file.save_result(os.path.join(result_path, support_version, "Localizations"))
 
 if config["git"]["enabled"]:
     git.push()
