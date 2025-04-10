@@ -10,3 +10,4 @@ config.toml
 /data
 /result
 steamorder.txt
+config.toml
