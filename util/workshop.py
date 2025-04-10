@@ -67,5 +67,5 @@ if __name__ == '__main__':
     import python_ta
     python_ta.check_all(config={'disable': ['E9999', 'W1203'], "max-line-length": 120})
 
-    fetcher = WorkshopNewMods(107410)
+    fetcher = WorkshopNewMods(1062090)
     fetcher.get_mods(3)

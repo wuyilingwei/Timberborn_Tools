@@ -17,16 +17,15 @@ class Config:
     config: Dict[str, Any]
     logger: logging.Logger
 
-    def __init__(self, config_path: Optional[str] = None) -> None:
+    def __init__(self, config_path: str) -> None:
         """
         Load config file from config_path
         """
-        if config_path is None:
-            config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.toml")
         self.config_path = config_path
         self.config = {}
         self.logger = logging.getLogger(self.__class__.__name__)
         self.load_config()
+        self.save_config()
 
     def __getitem__(self, key: str) -> Any:
         """
@@ -60,15 +59,23 @@ class Config:
         """
         default_config = {
             "translator": {
-                "type": "google",
-                "api_key": None,
-                "source_lang": "auto",
-                "target_lang": "en",
+                "type": "LLM",
+                "min_length": 3,
+                "max_length": 1000,
+                "rate_limit": "10/s",
+                "target_lang": ["en", "zh-CN"],
             },
             "workshop": {
                 "game_id": 0,
                 "text": "Mod",
+                "ids": [],
             },
+            "game": {
+                "versions": [],
+            },
+            "steam": {
+                "username": "",
+            }
         }
 
         def validate_recursive(current: Dict[str, Any], default: Dict[str, Any]) -> None:
@@ -95,5 +102,3 @@ class Config:
 if __name__ == '__main__':
     import python_ta
     python_ta.check_all(config={'disable': ['E9999', 'E9998', 'W1203'], "max-line-length": 120})
-    config = Config()
-    config.save_config()

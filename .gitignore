@@ -5,3 +5,8 @@ test.*
 *.log
 /translate/__pycache__
 /util/__pycache__
+config.toml
+/steamcmd
+/data
+/result
+steamorder.txt

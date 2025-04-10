@@ -84,7 +84,7 @@ class TranslatorGoogle(Translator):
     Google Translator
     THIS CLASS COULD NOT WORK
     """
-    def __init__(self, min_length: int = 0, max_length: int = 1000, rate_limit: str = "10/s") -> None:
+    def __init__(self, min_length: int = 3, max_length: int = 1000, rate_limit: str = "10/s") -> None:
         super().__init__(min_length, max_length, rate_limit)
 
     def translate(self, text: str, aim: str) -> dict:
@@ -119,14 +119,14 @@ class TranslatorLLM(Translator):
     """
     llm_data: dict
 
-    def __init__(self, min_length: int = 0, max_length: int = 1000, rate_limit: str = "10/s",
+    def __init__(self, min_length: int = 3, max_length: int = 1000, rate_limit: str = "10/s",
                  llm_info: dict = None) -> None:
         if llm_info is None:
             llm_info = {}
         self.llm_data = {
             "api": llm_info.get("api", "https://api.openai.com/v1/chat/completions"),
             "token": llm_info.get("token", ""),
-            "model": llm_info.get("model", "gpt-4o-mini-2024-07-18"),
+            "model": llm_info.get("model", "gpt-4o-mini"),
             "prompt": llm_info.get("prompt", "You are a helpful assistant that helps people with translation."
                                    "Translate the given text to {language} (Language Code) and only return the translated text."),
             "input_price": llm_info.get("input_price", 0.0),
