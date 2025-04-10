@@ -97,8 +97,3 @@ class Config:
         with open(self.config_path, "w", encoding="utf-8") as f:
             toml.dump(self.config, f)
         print(f"Config file saved to {self.config_path}")
-
-
-if __name__ == '__main__':
-    import python_ta
-    python_ta.check_all(config={'disable': ['E9999', 'E9998', 'W1203'], "max-line-length": 120})

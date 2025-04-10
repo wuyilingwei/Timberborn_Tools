@@ -200,8 +200,3 @@ class TranslatorLLM(Translator):
                  + self.llm_data["output_token"] * self.llm_data["output_price"])
         self.logger.info(f"Usage cost: {usage}")
         return usage
-
-
-if __name__ == '__main__':
-    import python_ta
-    python_ta.check_all(config={'disable': ['E9999', 'W1203'], "max-line-length": 120})

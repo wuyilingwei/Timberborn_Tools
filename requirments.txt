@@ -1,1 +1,2 @@
-python-ta
+requests
+toml

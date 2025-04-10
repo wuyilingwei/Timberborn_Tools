@@ -1,12 +1,7 @@
-/temp
-/test
-/logs
-test.*
-*.log
 /translate/__pycache__
 /util/__pycache__
 /steamcmd
 /data
 /result
-steamorder.txt
+/git
 config.toml

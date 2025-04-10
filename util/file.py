@@ -187,8 +187,3 @@ class CSV_File:
         self.logger.info("Data transfer completed")
         self.logger.debug(f"Final Data: {self.data}")
         return self.data
-
-
-if __name__ == '__main__':
-    import python_ta
-    python_ta.check_all(config={'disable': ['E9999', 'W1203'], "max-line-length": 120})
