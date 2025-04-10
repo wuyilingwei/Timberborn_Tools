@@ -141,7 +141,7 @@ class CSV_File:
             os.makedirs(path)
         try:
             for lang in self.target:
-                file_path = os.path.join(path, f"{lang}_{self.id}_{self.name}.csv")
+                file_path = os.path.join(path, f"{lang}_{self.id}_{self.name}.csv".replace(" ", "_"))
                 with open(file_path, 'w', encoding='utf-8', newline='') as file:
                     writer = csv.writer(file)
                     header = ['ID', 'Text', 'Comment']
