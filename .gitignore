@@ -1,4 +1,4 @@
 config.toml
 /steamcmd
 /util/__pycache__
-*.toml
+/git
