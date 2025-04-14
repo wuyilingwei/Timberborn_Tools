@@ -1,7 +1,4 @@
-/translate/__pycache__
-/util/__pycache__
-/steamcmd
-/data
-/result
-/git
 config.toml
+/steamcmd
+/util/__pycache__
+*.toml

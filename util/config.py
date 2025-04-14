@@ -58,6 +58,11 @@ class Config:
         Validate config file
         """
         default_config = {
+            "common": {
+                "consoleLevel": "INFO",
+                "fileLevel": "WARNING",
+                "logPath": "logs.txt"
+            },
             "translator": {
                 "type": "LLM",
                 "min_length": 3,

@@ -108,14 +108,6 @@ class CSV_File:
         except Exception as e:
             self.logger.error(f"Error loading old data from {path}: {e}")
             self.old_data = {}
-        for key in self.old_data:
-            if key not in self.data:
-                self.data[key] = {}
-            for lang in self.target:
-                if lang not in self.data[key]:
-                    self.data[key][lang] = ''
-                if lang in self.old_data[key]:
-                    self.data[key][lang] = self.old_data[key][lang]
 
     def save_data(self, path: str, filename: str) -> None:
         """

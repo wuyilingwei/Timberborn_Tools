@@ -5,6 +5,7 @@ from util.file import *
 from util.steamcmd import *
 from util.git import *
 import logging
+import shutil
 import argparse
 import os
 
@@ -20,14 +21,30 @@ data_path = os.path.join(git_path, "data")
 if not os.path.exists(data_path):
     os.makedirs(data_path)
 result_path = os.path.join(git_path, "mod")
-if not os.path.exists(result_path):
-    os.makedirs(result_path)
+if os.path.exists(result_path):
+    shutil.rmtree(result_path)
+os.makedirs(result_path)
 for game_version in config["game"]["versions"]:
     output_path = os.path.join(result_path, game_version)
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Basic logger setup
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+file_handler = logging.FileHandler(config["common"]["logPath"])
+file_handler.setLevel(config["common"]["fileLevel"])
+file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+file_handler.setFormatter(file_formatter)
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(config["common"]["consoleLevel"])
+console_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+console_handler.setFormatter(console_formatter)
+
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
 
 if config["git"]["enabled"]:
     git.pull()
@@ -40,7 +57,7 @@ new_mods = workshop.get_mods(config["workshop"]["depth"])
 for mod_id in new_mods:
     if mod_id not in config["workshop"]["ids"]:
         config["workshop"]["ids"].append(mod_id)
-        logging.info(f"New mod found: {mod_id}")
+        logger.info(f"New mod found: {mod_id}")
 
 # Download the mods using steamcmd
 steamClient = steamdownloader(config["steam"]["username"], os.path.join(workpath, "steamcmd"))
@@ -52,7 +69,7 @@ if config["translator"]["type"] == "LLM":
 elif config["translator"]["type"] == "google":
     translator = GoogleTranslator(config["translator"]["min_length"], config["translator"]["max_length"], config["translator"]["rate_limit"])
 else:
-    logging.error("Unsupported translator type")
+    logger.error("Unsupported translator type")
     translator = GoogleTranslator()
 
 for id in config["workshop"]["ids"]:
@@ -61,7 +78,7 @@ for id in config["workshop"]["ids"]:
     support_versions = search_file(mod_path, config["game"]["versions"])
 
     if support_versions == {} or support_versions is None:
-        logging.warning(f"Mod {id} cannot find any translation files")
+        logger.warning(f"Mod {id} cannot find any translation files")
         config["workshop"]["ids"].remove(id)
         continue
     for support_version in support_versions:
@@ -77,6 +94,7 @@ for id in config["workshop"]["ids"]:
             file.save_result(os.path.join(result_path, support_version, "Localizations"))
 
 if config["git"]["enabled"]:
+    git.pull()
     git.push()
 
 config.save_config()
