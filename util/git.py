@@ -1,3 +1,9 @@
+"""
+version: 1.0.0
+author: Wuyilingwei
+This module provides git actions
+This module is used to push and pull git repository
+"""
 import os
 import logging
 import subprocess

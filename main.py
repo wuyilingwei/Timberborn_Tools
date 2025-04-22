@@ -1,3 +1,15 @@
+"""
+version: 2.0.1
+author: Wuyilingwei
+Main script for the mod translation tool
+Target utils version:
+workshop: 1.0.x
+config: 1.0.x
+file: 1.0.x
+steamcmd: 1.0.x
+git: 1.0.x
+TODO: argparse support
+"""
 from util.workshop import *
 from util.translator import *
 from util.config import *

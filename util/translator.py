@@ -1,8 +1,9 @@
 """
-version: 0.1.0
+version: 1.0.0
 author: Wuyilingwei
 This module provides class of translators
-Support Google Translator and OPENAI-STYLED LLM API Translator
+Support OPENAI-STYLED LLM API Translator
+TODO: Google Translator
 """
 import time
 import json
@@ -86,6 +87,7 @@ class TranslatorGoogle(Translator):
     """
     def __init__(self, min_length: int = 3, max_length: int = 1000, rate_limit: str = "10/s") -> None:
         super().__init__(min_length, max_length, rate_limit)
+        raise NotImplementedError("Google Translator is not supported yet")
 
     def translate(self, text: str, aim: str) -> dict:
         self.logger.info(f"Translating text: {text}")

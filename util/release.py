@@ -1,3 +1,10 @@
+"""
+version: 0.1.0 Alpha
+author: Wuyilingwei
+This module provides release functions for mods
+This module is used to release mods to Steam Workshop and GitHub
+! THIS MODULE IS INCOMPLETE !
+"""
 import os
 import subprocess
 import shutil
@@ -18,6 +25,7 @@ class Releaser:
         self.app_id = app_id
         self.published_file_id = published_file_id
         self.logger = logging.getLogger(self.__class__.__name__)
+        raise NotImplementedError("This class is not fully implemented yet.")
 
     def update_version(self, overwrite=False):
         if not os.path.exists(self.manifest_file):

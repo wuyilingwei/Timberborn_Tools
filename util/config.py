@@ -1,7 +1,8 @@
 """
-version: 0.1.0
+version: 1.0.0
 author: Wuyilingwei
-Config file loader
+This module provides config management
+This module is used to load and save (fix) config file
 """
 import os
 import logging

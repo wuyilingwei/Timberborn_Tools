@@ -1,3 +1,8 @@
+"""
+version: 1.0.0
+author: Wuyilingwei
+This module provides steamcmd actions
+"""
 import os
 import subprocess
 import logging

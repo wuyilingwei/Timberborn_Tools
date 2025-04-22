@@ -1,3 +1,13 @@
+"""
+version: 1.0.0
+author: Wuyilingwei
+This module provides CSV file management
+This module is used to read and write CSV files
+This module is also used to handle translation process for CSV files
+Target utils version:
+translator: 1.0.x
+TODO: Ignore built-in key in game.
+"""
 import os
 import csv
 import toml
@@ -23,7 +33,7 @@ def search_file(path: str, versions: list[str], keyword = "en") -> dict[str, str
                         if 'ID,Text,Comment' in firstline:
                             return os.path.join(root, file)
             for file in files:
-                # try ti match other language file
+                # try match other language file
                 if file.endswith('.csv') or file.endswith('.txt'):
                     with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
                         firstline = f.readline().strip()
@@ -170,12 +180,12 @@ class CSV_File:
                                 self.logger.warning(f"Retrying translation for {values['raw']} to {lang}, attempts left: {max_retries}")
                         if max_retries == 0 and result["code"] != 200:
                             self.logger.error(f"Translation failed for {values['raw']} to {lang}: {result['text']}")
-                            self.data[key][lang] = 'Error'
+                            self.data[key][lang] = values['raw']
                             raise Exception("Max retries exceeded")
                         self.data[key][lang] = result["text"]
                     except Exception as e:
                         self.logger.error(f"Error translating {values['raw']} to {lang}: {e}")
-                        self.data[key][lang] = 'Error'
+                        self.data[key][lang] = values['raw']
         self.logger.info("Data transfer completed")
         self.logger.debug(f"Final Data: {self.data}")
         return self.data
