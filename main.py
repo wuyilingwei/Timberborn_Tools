@@ -71,7 +71,7 @@ for mod_id in new_mods:
         config["workshop"]["ids"].append(mod_id)
         logger.info(f"New mod found: {mod_id}")
 
-for black_id in config["workshop"]["blacklist"]:
+for black_id in config["workshop"]["blacklist_ids"]:
     if black_id in config["workshop"]["ids"]:
         config["workshop"]["ids"].remove(black_id)
         logger.info(f"Mod {black_id} is blacklisted and removed from the list")
