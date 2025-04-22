@@ -4,6 +4,8 @@ author: Wuyilingwei
 This module provides release functions for mods
 This module is used to release mods to Steam Workshop and GitHub
 ! THIS MODULE IS INCOMPLETE !
+This module will rewrite to steamcmd and github release module
+Transfer from scripts.sh
 """
 import os
 import subprocess
