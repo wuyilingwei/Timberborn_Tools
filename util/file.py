@@ -163,7 +163,7 @@ class CSV_File:
                 continue
             for key, values in self.data.items():
                 # check if the key is in old data and the value is the same
-                if key in self.old_data and lang in self.old_data[key] and values['raw'] == self.old_data[key]['raw']:
+                if key in self.old_data and lang in self.old_data[key] and values['raw'].replace('\u00A0', ' ') == self.old_data[key]['raw']:
                     self.data[key][lang] = self.old_data[key][lang]
                     self.logger.info(f"Matched {values['raw']} to {lang}: {self.data[key][lang]}")
                 else:
