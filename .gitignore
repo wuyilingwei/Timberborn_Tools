@@ -2,3 +2,4 @@ config.toml
 /steamcmd
 /util/__pycache__
 /git
+test*.*

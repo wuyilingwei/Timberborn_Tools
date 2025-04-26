@@ -45,7 +45,7 @@ for game_version in config["game"]["versions"]:
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-file_handler = logging.FileHandler(config["common"]["logPath"])
+file_handler = logging.FileHandler(config["common"]["logPath"], encoding='utf-8')
 file_handler.setLevel(config["common"]["fileLevel"])
 file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 file_handler.setFormatter(file_formatter)
