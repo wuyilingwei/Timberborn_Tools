@@ -12,7 +12,7 @@ type = "LLM"
 min_length = 3
 max_length = 1000
 rate_limit = "1000/m"
-target_lang = [ "enUS", "zhCN", "zhTW", "ruRU", "jaJP", "frFR", "deDE","zhHK","plPL"]
+target_lang = [ "enUS", "zhCN", "zhTW", "ruRU", "jaJP", "frFR", "deDE", "zhHK", "plPL",]
 
 [workshop]
 game_id = 1062090

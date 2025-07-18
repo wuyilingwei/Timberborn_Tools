@@ -21,7 +21,9 @@ def search_file(path: str, versions: list[str], keyword = "en") -> dict[str, str
     versions: the versions to search for
     keyword: the keyword to search for
     If not multiple versions, will return the default
+    Auto-detects version folders with pattern "version-x.x.x"
     """
+    import re
     logger = logging.getLogger(__name__)
     def search_helper(path: str, keyword) -> str:
         for root, dirs, files in os.walk(path):
@@ -43,14 +45,36 @@ def search_file(path: str, versions: list[str], keyword = "en") -> dict[str, str
     logger = logging.getLogger(__name__)
     result = {}
     is_mult_version = False
-    for version in versions:
+    
+    # Auto-detect version folders with pattern "version-x.x.x"
+    version_pattern = re.compile(r'^version-\d+\.\d+(?:\.\d+)?$')
+    detected_versions = []
+    
+    if os.path.exists(path):
+        for item in os.listdir(path):
+            item_path = os.path.join(path, item)
+            if os.path.isdir(item_path) and version_pattern.match(item):
+                detected_versions.append(item)
+                logger.debug(f"Auto-detected version folder: {item}")
+    
+    # Combine provided versions with detected versions, prioritizing detected ones
+    all_versions = detected_versions + [v for v in versions if v not in detected_versions]
+    
+    for version in all_versions:
         logger.debug(f"Searching for {keyword} in {os.path.join(path, version)}")
         if os.path.exists(os.path.join(path, version)):
-            result[version] = search_helper(os.path.join(path, version), keyword)
-            is_mult_version = True
+            found_file = search_helper(os.path.join(path, version), keyword)
+            if found_file:
+                result[version] = found_file
+                is_mult_version = True
+                logger.debug(f"Found file for {version}: {found_file}")
+    
     if not is_mult_version:
         logger.debug(f"Searching for {keyword} in {path}")
-        result["default"] = search_helper(path, keyword)
+        found_file = search_helper(path, keyword)
+        if found_file:
+            result["default"] = found_file
+    
     if len(result) == 0:
         logger.error(f"ERROR: {path} not found")
         return None
