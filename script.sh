@@ -12,6 +12,7 @@ RELEASE_DIR="$BASE_DIR/release"
 CONTEXT_DIR="$GIT_DIR/mod"
 MANIFEST_FILE="$MOD_INFO_DIR/manifest.json"
 VERSIONS_FILE="$GIT_DIR/versions.txt"
+VENV_DIR="$BASE_DIR/venv"
 
 # =========== Mod Config ===========
 APPID="1062090"
@@ -22,6 +23,7 @@ REPO_OWNER="wuyilingwei"
 REPO_NAME="Timberborn_Mods_Universal_Translate"
 
 # =========== Command Config ===========
+GETUPDATE=true
 FORCE_UPDATE=false
 OVERWRITE=false
 PUSH_STEAM=true
@@ -36,6 +38,9 @@ for arg in "$@"; do
         -overwrite)
             OVERWRITE=true
             ;;
+        -skip_update)
+            GETUPDATE=false
+            ;;
         -no_steam)
             PUSH_STEAM=false
             ;;
@@ -44,6 +49,18 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# =========== Ensure Virtual Environment ===========
+if [ ! -d "$VENV_DIR" ] || [ ! -f "$VENV_DIR/bin/activate" ]; then
+    echo "Virtual environment not found. Creating virtual environment..."
+    python3 -m venv "$VENV_DIR"
+    source "$VENV_DIR/bin/activate"
+    pip install --upgrade pip
+    pip install -r "$BASE_DIR/requirments.txt"
+else
+    echo "Activating virtual environment..."
+    source "$VENV_DIR/bin/activate"
+fi
 
 # =========== Main ===========
 echo "Run time:$(date)"
@@ -62,7 +79,7 @@ echo "Remote commit: $REMOTE"
 
 # =========== Check Updates ===========
 if [ "$LOCAL" != "$REMOTE" ] || [ "$FORCE_UPDATE" = true ]; then
-    if [ "$LOCAL" != "$REMOTE" ]; then
+    if [ "$LOCAL" != "$REMOTE" ] && [ "$GETUPDATE" = true ]; then
         echo "Detected updates, pulling..."
     else
         echo "Forced update, pulling..."
@@ -110,7 +127,13 @@ if [ "$LOCAL" != "$REMOTE" ] || [ "$FORCE_UPDATE" = true ]; then
     rm -rf "$RELEASE_DIR"
     mkdir -p "$RELEASE_DIR"
 
-    cp -r "$CONTEXT_DIR"/* "$RELEASE_DIR"/
+    # 检查 CONTEXT_DIR 是否存在且非空
+    if [ -d "$CONTEXT_DIR" ] && [ "$(ls -A "$CONTEXT_DIR")" ]; then
+        cp -r "$CONTEXT_DIR"/* "$RELEASE_DIR"/
+    else
+        echo "Warning: $CONTEXT_DIR is empty or does not exist. Skipping copy."
+    fi
+
     cp -r "$MOD_INFO_DIR"/thumbnail.png "$RELEASE_DIR"/
     cp -r "$MOD_INFO_DIR"/workshop_data.json "$RELEASE_DIR"/
     cp -r "$MOD_INFO_DIR"/License.txt "$RELEASE_DIR"/
@@ -120,6 +143,108 @@ if [ "$LOCAL" != "$REMOTE" ] || [ "$FORCE_UPDATE" = true ]; then
         mkdir -p "$RELEASE_VERSION_DIR"
         cp -r "$MOD_INFO_DIR"/manifest.json "$RELEASE_VERSION_DIR"/
     done
+
+    # =========== Convert TOML to CSV ===========
+    DATA_DIR="$GIT_DIR/data"
+    MOD_DIR="$GIT_DIR/mod"
+
+    echo "Converting TOML files to CSV..."
+    python3 - <<EOF
+import os
+import re
+import toml
+import csv
+import shutil
+
+data_dir = "$DATA_DIR"
+mod_dir = "$MOD_DIR"
+
+# 第一阶段：处理所有 TOML 文件（包括 default）
+default_files = {}  # 存储 default 版本的文件信息
+
+for file_name in os.listdir(data_dir):
+    if file_name.endswith(".toml"):
+        # 提取 mod_id 和 version
+        if "_default.toml" in file_name:
+            # 处理 default 版本
+            mod_id = file_name.replace("_default.toml", "")
+            version = "default"
+        else:
+            match = re.search(r"(\\d+)_version-(.+)\\.toml", file_name)
+            if not match:
+                print(f"Skipping file {file_name}: does not match expected pattern")
+                continue
+            mod_id, version = match.groups()
+        
+        version_folder = f"version-{version}" if version != "default" else "default"
+        toml_path = os.path.join(data_dir, file_name)
+        output_dir = os.path.join(mod_dir, version_folder, "Localizations")
+        os.makedirs(output_dir, exist_ok=True)
+
+        # 读取 TOML 文件
+        try:
+            with open(toml_path, "r", encoding="utf-8") as toml_file:
+                data = toml.load(toml_file)
+            
+            # 收集所有语言代码
+            all_languages = set()
+            for key, translations in data.items():
+                if isinstance(translations, dict):
+                    for lang_code in translations.keys():
+                        if lang_code != "raw":
+                            all_languages.add(lang_code)
+            
+            # 为每种语言生成 CSV 文件
+            generated_files = []
+            for lang_code in all_languages:
+                csv_file_name = f"{lang_code}_{mod_id}.csv"
+                csv_path = os.path.join(output_dir, csv_file_name)
+                
+                with open(csv_path, "w", encoding="utf-8", newline="") as csv_file:
+                    writer = csv.writer(csv_file)
+                    writer.writerow(["ID", "Text", "Comment"])
+                    
+                    # 遍历所有翻译条目
+                    for translation_key, translations in data.items():
+                        if isinstance(translations, dict) and lang_code in translations:
+                            translation_text = translations[lang_code]
+                            writer.writerow([translation_key, translation_text, "-"])
+                
+                generated_files.append((csv_file_name, csv_path))
+                print(f"Generated CSV: {csv_path}")
+            
+            # 如果是 default 版本，记录生成的文件
+            if version == "default":
+                default_files[mod_id] = {
+                    'output_dir': output_dir,
+                    'files': generated_files
+                }
+                
+        except Exception as e:
+            print(f"Failed to process {toml_path}: {e}")
+
+# 第二阶段：将 default 文件复制到其他版本文件夹
+if default_files:
+    print("Copying default files to other version folders...")
+    version_dirs = [d for d in os.listdir(mod_dir) if d.startswith("version-") and os.path.isdir(os.path.join(mod_dir, d))]
+    
+    for mod_id, default_info in default_files.items():
+        for version_dir in version_dirs:
+            target_localization_dir = os.path.join(mod_dir, version_dir, "Localizations")
+            os.makedirs(target_localization_dir, exist_ok=True)
+            
+            for csv_file_name, source_path in default_info['files']:
+                target_path = os.path.join(target_localization_dir, csv_file_name)
+                
+                # 只在目标文件不存在时复制
+                if not os.path.exists(target_path):
+                    shutil.copy2(source_path, target_path)
+                    print(f"Copied default file to: {target_path}")
+                else:
+                    print(f"Skipped copying to {target_path} (file already exists)")
+EOF
+
+    echo "TOML to CSV conversion completed."
 
     # =========== Push to Steam Workshop ===========
     if [ "$PUSH_STEAM" = true ]; then
