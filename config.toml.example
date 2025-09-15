@@ -2,6 +2,8 @@
 consoleLevel = "INFO"
 fileLevel = "WARNING"
 logPath = "log.txt"
+defaultLanguage = "enUS"
+correctiveLanguage = ["zhCN"]
 
 [git]
 enabled = true

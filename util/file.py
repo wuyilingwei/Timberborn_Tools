@@ -1,5 +1,5 @@
 """
-version: 1.0.1
+version: 1.1.0
 author: Wuyilingwei
 This module provides CSV file management
 This module is used to read and write CSV files
@@ -14,47 +14,6 @@ import toml
 import logging
 from util.translator import *
 
-def search_file(path: str, versions: list[str], keyword = "en") -> dict[str, str]:
-    """
-    search for the file in the path and versions
-    path: the path to search
-    versions: the versions to search for
-    keyword: the keyword to search for
-    If not multiple versions, will return the default
-    """
-    logger = logging.getLogger(__name__)
-    def search_helper(path: str, keyword) -> str:
-        for root, dirs, files in os.walk(path):
-            for file in files:
-                if keyword in file and (file.endswith('.csv') or file.endswith('.txt')):
-                    # check header
-                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
-                        firstline = f.readline().strip()
-                        if 'ID,Text,Comment' in firstline:
-                            return os.path.join(root, file)
-            for file in files:
-                # try match other language file
-                if file.endswith('.csv') or file.endswith('.txt'):
-                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
-                        firstline = f.readline().strip()
-                        if 'ID,Text,Comment' in firstline:
-                            return os.path.join(root, file)
-        return None
-    logger = logging.getLogger(__name__)
-    result = {}
-    is_mult_version = False
-    for version in versions:
-        logger.debug(f"Searching for {keyword} in {os.path.join(path, version)}")
-        if os.path.exists(os.path.join(path, version)):
-            result[version] = search_helper(os.path.join(path, version), keyword)
-            is_mult_version = True
-    if not is_mult_version:
-        logger.debug(f"Searching for {keyword} in {path}")
-        result["default"] = search_helper(path, keyword)
-    if len(result) == 0:
-        logger.error(f"ERROR: {path} not found")
-        return None
-    return result
 
 
 class CSV_File:
@@ -134,27 +93,6 @@ class CSV_File:
         except Exception as e:
             self.logger.error(f"Error saving data to {file_path}/{filename}.toml: {e}")
 
-    def save_result(self, path: str) -> None:
-        """
-        Save translation results to separate files for each target language.
-        Each file contains only the ID and Text fields, with Comment as a placeholder.
-        """
-        if not os.path.exists(path):
-            os.makedirs(path)
-        try:
-            for lang in self.target:
-                file_path = os.path.join(path, f"{lang}_{self.id}_{self.name}.csv".replace(" ", "_"))
-                with open(file_path, 'w', encoding='utf-8', newline='') as file:
-                    writer = csv.writer(file)
-                    header = ['ID', 'Text', 'Comment']
-                    writer.writerow(header)
-                    for key, values in self.data.items():
-                        text = values.get(lang, '')
-                        row = [key, text, '-']
-                        writer.writerow(row)
-                self.logger.info(f"Saved result for language '{lang}' to {file_path}")
-        except Exception as e:
-            self.logger.error(f"Error saving result to {path}: {e}")
 
     def transfer_data(self) -> dict[str, dict]:
         for lang in self.target:
@@ -189,3 +127,183 @@ class CSV_File:
         self.logger.info("Data transfer completed")
         self.logger.debug(f"Final Data: {self.data}")
         return self.data
+
+    def get_translation_data(self) -> Dict:
+        """获取翻译数据字典"""
+        if not hasattr(self, 'data') or self.data is None:
+            return {}
+        
+        translation_data = {}
+        for key, item in self.data.items():
+            if isinstance(item, dict):
+                translation_data[key] = {
+                    'raw': item.get('raw', ''),
+                    'translation': item.get('translation', ''),
+                    'auxiliary_lang': item.get('auxiliary_lang', ''),
+                    'last_update': item.get('last_update', ''),
+                    'status': item.get('status', 'pending')
+                }
+        return translation_data
+    
+    def get_raw_data(self) -> Dict:
+        """获取原始文本数据"""
+        if not hasattr(self, 'raw_data'):
+            self._load_raw_data()
+        return getattr(self, 'raw_data', {})
+    
+    def _load_raw_data(self):
+        """加载原始CSV文件数据"""
+        self.raw_data = {}
+        try:
+            import pandas as pd
+            df = pd.read_csv(self.raw)
+            if 'Key' in df.columns and 'Text' in df.columns:
+                for _, row in df.iterrows():
+                    key = str(row['Key']).strip()
+                    text = str(row['Text']).strip()
+                    if key and text:
+                        self.raw_data[key] = text
+        except Exception as e:
+            logger.error(f"Failed to load raw data from {self.raw}: {e}")
+    
+    def has_translation(self, key: str) -> bool:
+        """检查指定键是否已有翻译"""
+        if not hasattr(self, 'data') or self.data is None:
+            return False
+        
+        item = self.data.get(key, {})
+        if isinstance(item, dict):
+            translation = item.get('translation', '').strip()
+            return bool(translation)
+        return False
+    
+    def copy_translation(self, key: str, source_info: Dict):
+        """从其他版本复制翻译"""
+        if not hasattr(self, 'data'):
+            self.data = {}
+        
+        if key not in self.data:
+            self.data[key] = {}
+        
+        # 复制翻译信息
+        self.data[key]['translation'] = source_info.get('translation', '')
+        self.data[key]['auxiliary_lang'] = source_info.get('auxiliary_lang', '')
+        self.data[key]['status'] = 'copied'
+        self.data[key]['last_update'] = source_info.get('last_update', '')
+        
+        # 确保原始文本信息存在
+        raw_data = self.get_raw_data()
+        if key in raw_data:
+            self.data[key]['raw'] = raw_data[key]
+    
+    def translate_with_context(self, auxiliary_info: Dict):
+        """使用增强上下文进行翻译"""
+        if not hasattr(self, 'data'):
+            self.data = {}
+        
+        raw_data = self.get_raw_data()
+        
+        for key, raw_text in raw_data.items():
+            # 跳过已有翻译的项目
+            if self.has_translation(key):
+                continue
+            
+            # 跳过长度不符合要求的文本
+            if not self._should_translate(raw_text):
+                continue
+            
+            # 准备翻译上下文
+            context = self._prepare_translation_context(key, raw_text, auxiliary_info)
+            
+            try:
+                # 执行翻译
+                translation_result = self.translator.translate_with_context(
+                    text=raw_text,
+                    context=context,
+                    target_lang=self.target
+                )
+                
+                # 保存翻译结果
+                if key not in self.data:
+                    self.data[key] = {}
+                
+                self.data[key]['raw'] = raw_text
+                self.data[key]['translation'] = translation_result.get('translation', '')
+                self.data[key]['auxiliary_lang'] = translation_result.get('auxiliary_lang', '')
+                self.data[key]['status'] = 'translated'
+                self.data[key]['last_update'] = translation_result.get('timestamp', '')
+                
+                logger.info(f"Translated key '{key}' for {self.name}")
+                
+            except Exception as e:
+                logger.error(f"Failed to translate key '{key}' for {self.name}: {e}")
+                if key not in self.data:
+                    self.data[key] = {}
+                self.data[key]['raw'] = raw_text
+                self.data[key]['status'] = 'failed'
+    
+    def _should_translate(self, text: str) -> bool:
+        """检查文本是否应该被翻译"""
+        if not text or not text.strip():
+            return False
+        
+        text_length = len(text.strip())
+        min_length = getattr(self.translator, 'min_length', 0)
+        max_length = getattr(self.translator, 'max_length', float('inf'))
+        
+        return min_length <= text_length <= max_length
+    
+    def _prepare_translation_context(self, key: str, raw_text: str, auxiliary_info: Dict) -> Dict:
+        """准备翻译上下文信息"""
+        context = {
+            'key': key,
+            'raw_text': raw_text,
+            'mod_name': self.name,
+            'previous_translations': [],
+            'similar_translations': []
+        }
+        
+        # 添加其他版本的翻译信息
+        if key in auxiliary_info:
+            for aux_info in auxiliary_info[key]:
+                if aux_info['translation']:
+                    context['previous_translations'].append({
+                        'version': aux_info['version'],
+                        'raw': aux_info['raw'],
+                        'translation': aux_info['translation'],
+                        'auxiliary_lang': aux_info['auxiliary_lang']
+                    })
+        
+        # 查找相似的翻译（基于原始文本相似度）
+        for aux_key, aux_versions in auxiliary_info.items():
+            if aux_key != key:
+                for aux_info in aux_versions:
+                    if (aux_info['raw'] and aux_info['translation'] and 
+                        self._is_similar_text(raw_text, aux_info['raw'])):
+                        context['similar_translations'].append({
+                            'key': aux_key,
+                            'raw': aux_info['raw'],
+                            'translation': aux_info['translation']
+                        })
+        
+        return context
+    
+    def _is_similar_text(self, text1: str, text2: str) -> bool:
+        """检查两个文本是否相似"""
+        if not text1 or not text2:
+            return False
+        
+        # 简单的相似度检查：长度相近且有共同词汇
+        len_diff = abs(len(text1) - len(text2))
+        if len_diff > min(len(text1), len(text2)) * 0.5:
+            return False
+        
+        words1 = set(text1.lower().split())
+        words2 = set(text2.lower().split())
+        if not words1 or not words2:
+            return False
+        
+        common_words = words1.intersection(words2)
+        similarity = len(common_words) / min(len(words1), len(words2))
+        
+        return similarity > 0.6  # 60%相似度阈值

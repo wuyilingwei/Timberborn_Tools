@@ -62,7 +62,9 @@ class Config:
             "common": {
                 "consoleLevel": "INFO",
                 "fileLevel": "WARNING",
-                "logPath": "logs.txt"
+                "logPath": "logs.txt",
+                "defaultLanguage": "enUS",
+                "correctiveLanguage": ["zhCN"]
             },
             "translator": {
                 "type": "LLM",

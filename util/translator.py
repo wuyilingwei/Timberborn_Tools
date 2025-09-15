@@ -114,6 +114,28 @@ class TranslatorGoogle(Translator):
         # Google Translator does not provide a usage cost
         return 0.0
 
+    def translate_with_context(self, text: str, context: dict, target_lang: str) -> dict:
+        """Google翻译的上下文翻译（简化版）"""
+        import time
+        
+        # Google翻译不支持复杂上下文，使用普通翻译
+        # 但可以利用历史翻译进行一致性检查
+        translation = self.translate(text, target_lang)
+        
+        # 检查与历史翻译的一致性
+        if context.get('previous_translations'):
+            for prev in context['previous_translations']:
+                if prev['raw'] == text and prev['translation']:
+                    # 如果找到完全相同的历史翻译，优先使用
+                    translation = prev['translation']
+                    break
+        
+        return {
+            'translation': translation,
+            'auxiliary_lang': '',
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+
 
 class TranslatorLLM(Translator):
     """
@@ -202,3 +224,69 @@ class TranslatorLLM(Translator):
                  + self.llm_data["output_token"] * self.llm_data["output_price"])
         self.logger.info(f"Usage cost: {usage}")
         return usage
+
+    def translate_with_context(self, text: str, context: dict, target_lang: str) -> dict:
+        """使用上下文信息进行翻译"""
+        import time
+        
+        # 构建提示词
+        prompt = self._build_context_prompt(text, context, target_lang)
+        
+        try:
+            # 调用LLM进行翻译
+            result = self._call_llm_with_context(prompt)
+            
+            return {
+                'translation': result.get('translation', ''),
+                'auxiliary_lang': result.get('auxiliary_lang', ''),
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+            }
+        except Exception as e:
+            self.logger.error(f"LLM translation with context failed: {e}")
+            # 降级到普通翻译
+            return {
+                'translation': self.translate(text, target_lang),
+                'auxiliary_lang': '',
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+            }
+    
+    def _build_context_prompt(self, text: str, context: dict, target_lang: str) -> str:
+        """构建包含上下文的提示词"""
+        prompt_parts = [
+            f"请将以下文本翻译为{target_lang}:",
+            f"原文: {text}",
+            f"上下文: 这是游戏mod '{context.get('mod_name', '')}' 中键 '{context.get('key', '')}' 的翻译"
+        ]
+        
+        # 添加历史翻译信息
+        if context.get('previous_translations'):
+            prompt_parts.append("\n历史翻译参考:")
+            for prev in context['previous_translations'][:3]:  # 最多3个参考
+                prompt_parts.append(f"- 版本{prev['version']}: '{prev['raw']}' -> '{prev['translation']}'")
+        
+        # 添加相似翻译信息
+        if context.get('similar_translations'):
+            prompt_parts.append("\n相似文本翻译参考:")
+            for sim in context['similar_translations'][:2]:  # 最多2个参考
+                prompt_parts.append(f"- '{sim['raw']}' -> '{sim['translation']}'")
+        
+        prompt_parts.append("\n请提供准确且一致的翻译:")
+        
+        return "\n".join(prompt_parts)
+    
+    def _call_llm_with_context(self, prompt: str) -> dict:
+        """调用LLM API进行上下文翻译"""
+        # 这里需要根据你的LLM配置实现具体的API调用
+        # 返回格式: {'translation': '翻译结果', 'auxiliary_lang': '辅助语言(可选)'}
+        
+        # 示例实现 - 需要根据实际LLM API调整
+        try:
+            # 假设使用某个LLM API
+            response = self._make_llm_request(prompt)
+            return {
+                'translation': response.get('text', ''),
+                'auxiliary_lang': ''
+            }
+        except Exception as e:
+            self.logger.error(f"LLM API call failed: {e}")
+            raise
