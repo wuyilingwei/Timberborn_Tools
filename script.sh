@@ -17,7 +17,6 @@ MOD_INFO_DIR="$BASE_DIR/mod_info"
 RELEASE_DIR="$BASE_DIR/release"
 CONTEXT_DIR="$GIT_DIR/mod"
 MANIFEST_FILE="$MOD_INFO_DIR/manifest.json"
-VERSIONS_FILE="$GIT_DIR/versions.txt"
 VENV_DIR="$BASE_DIR/venv"
 
 # =========== Mod Config ===========
@@ -118,18 +117,7 @@ if [ "$LOCAL" != "$REMOTE" ] || [ "$FORCE_UPDATE" = true ]; then
         echo "No manifest.json found, skip version update."
     fi
 
-    if [ ! -s "$VERSIONS_FILE" ]; then
-        echo "Error: versions.txt is empty or not exists!"
-        exit 1
-    fi
-
     # =========== Create Release ===========
-    sed -i 's/\r$//' "$VERSIONS_FILE"
-    sed -i 's/^,\|,$//g' "$VERSIONS_FILE"
-
-    IFS=',' read -r -a VERSIONS < "$VERSIONS_FILE" || true
-    echo "All game versions: ${VERSIONS[@]}"
-
     rm -rf "$RELEASE_DIR"
     mkdir -p "$RELEASE_DIR"
 
@@ -143,12 +131,6 @@ if [ "$LOCAL" != "$REMOTE" ] || [ "$FORCE_UPDATE" = true ]; then
     cp -r "$MOD_INFO_DIR"/thumbnail.png "$RELEASE_DIR"/
     cp -r "$MOD_INFO_DIR"/workshop_data.json "$RELEASE_DIR"/
     cp -r "$MOD_INFO_DIR"/License.txt "$RELEASE_DIR"/
-
-    for version in "${VERSIONS[@]}"; do
-        RELEASE_VERSION_DIR="$RELEASE_DIR/$version"
-        mkdir -p "$RELEASE_VERSION_DIR"
-        cp -r "$MOD_INFO_DIR"/manifest.json "$RELEASE_VERSION_DIR"/
-    done
 
     # 清理目录
     DATA_DIR="$GIT_DIR/data"
@@ -174,6 +156,33 @@ if [ "$LOCAL" != "$REMOTE" ] || [ "$FORCE_UPDATE" = true ]; then
     python3 "$PYTHON_SCRIPT" "$DATA_DIR" "$MOD_DIR" 2>&1 | tee "$PYTHON_LOG_FILE"
 
     echo "TOML to CSV conversion completed."
+
+    # =========== 从release目录读取版本 ===========
+    echo "Scanning release directory for version folders..."
+    VERSIONS=()
+    if [ -d "$RELEASE_DIR" ]; then
+        for dir in "$RELEASE_DIR"/version-*; do
+            if [ -d "$dir" ]; then
+                version_name=$(basename "$dir")
+                version=${version_name#version-}  # 移除"version-"前缀
+                VERSIONS+=("$version")
+            fi
+        done
+    fi
+
+    if [ ${#VERSIONS[@]} -eq 0 ]; then
+        echo "Error: No version folders found in release directory!"
+        exit 1
+    fi
+
+    echo "Found game versions: ${VERSIONS[@]}"
+
+    # 为每个版本创建manifest.json
+    for version in "${VERSIONS[@]}"; do
+        RELEASE_VERSION_DIR="$RELEASE_DIR/version-$version"
+        mkdir -p "$RELEASE_VERSION_DIR"
+        cp -r "$MOD_INFO_DIR"/manifest.json "$RELEASE_VERSION_DIR"/
+    done
 
     # =========== Push to Steam Workshop ===========
     if [ "$PUSH_STEAM" = true ]; then
