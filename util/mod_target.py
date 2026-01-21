@@ -5,6 +5,7 @@ Only keeps the latest version, merging unique keys from older versions
 """
 import os
 import logging
+import toml
 from typing import Dict, List, Tuple
 from collections import OrderedDict
 from .file import CSV_File
@@ -67,7 +68,6 @@ class ModTarget:
     
     def load_old_data(self, data_path: str):
         """加载所有版本的历史数据"""
-        import toml
         
         # Load single-file format (new format without version suffix)
         old_data_file = os.path.join(data_path, f"{self.mod_id}.toml")
@@ -122,9 +122,9 @@ class ModTarget:
         """合并所有旧版本数据：以最新版本为基础，添加旧版本的独立键值对"""
         merged = OrderedDict()
         
-        # Start with single-file format if it exists
+        # Start with single-file format if it exists (use OrderedDict constructor for proper copying)
         if 'single' in self.old_version_data:
-            merged = self.old_version_data['single'].copy()
+            merged = OrderedDict(self.old_version_data['single'])
             logger.info(f"Base: single-file format with {len(merged)} keys")
         
         # Get the latest version's old data if it exists
@@ -133,7 +133,7 @@ class ModTarget:
             if latest_version in self.old_version_data:
                 # Use latest version as base or merge it
                 if not merged:
-                    merged = self.old_version_data[latest_version].copy()
+                    merged = OrderedDict(self.old_version_data[latest_version])
                     logger.info(f"Base: version {latest_version} with {len(merged)} keys")
                 else:
                     # Merge latest version data, prioritizing it over single-file
@@ -141,8 +141,8 @@ class ModTarget:
                         merged[key] = value
                     logger.info(f"Merged version {latest_version}")
         
-        # Now merge unique keys from older versions
-        for version in reversed(self.version_priority[1:]):  # Skip latest, process old to new
+        # Now merge unique keys from older versions (process from older to newer, so newer values overwrite)
+        for version in self.version_priority[1:]:  # Skip latest version
             if version in self.old_version_data:
                 old_data = self.old_version_data[version]
                 added_count = 0
