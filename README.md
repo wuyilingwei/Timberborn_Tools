@@ -2,6 +2,22 @@
 
 Tools for managing Timberborn mod translations and data updates.
 
+## Version 3.1
+
+V3.1 introduces single-version tracking with backward compatibility.
+
+### Key Changes in V3.1
+- **Single-version tracking**: Only the latest game version is tracked per mod
+- **Smart version merging**: Automatically merges unique keys from older versions
+- **Backward compatible**: Migrates from multi-version format automatically
+- **Simplified data files**: One TOML file per mod (no version suffix)
+
+### Version Selection Logic
+- Always uses the latest version found in the mod
+- Merges unique keys from older versions for compatibility
+- When keys conflict, always prioritizes the newest version
+- Supports version formats: `version-1.0`, `version-0.6.1`, `version-0.7`, etc.
+
 ## Version 3
 
 V3 focuses on mod data preparation for cloud-based translation workflows.
