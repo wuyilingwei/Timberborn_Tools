@@ -77,13 +77,8 @@ class TomlFile:
         """
         self.updated_data = OrderedDict()
         
-        # Add/update name field at the top
-        if 'name' not in self.old_data or self.old_data.get('name', '') != self.mod_name:
-            self.updated_data['name'] = self.mod_name
-        elif 'name' in self.old_data:
-            self.updated_data['name'] = self.old_data['name']
-        else:
-            self.updated_data['name'] = self.mod_name
+        # Always update name field to current mod name
+        self.updated_data['name'] = self.mod_name
         
         # Preserve field_prompt if it exists
         if 'field_prompt' in self.old_data:
@@ -103,7 +98,7 @@ class TomlFile:
                     # Value changed - add 'new' field
                     # First copy existing fields
                     for field, value in old_entry.items():
-                        if field not in ['new']:  # Don't copy old 'new' field
+                        if field != 'new':  # Don't copy old 'new' field
                             self.updated_data[key][field] = value
                     
                     # Add 'new' field after 'raw' if 'raw' exists
