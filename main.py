@@ -1,43 +1,35 @@
 """
-version: 2.2.0
+version: 3.0.0
 author: Wuyilingwei
-Main script for the mod translation tool
+Main script for the mod data update tool
+Focus: Fetch new mods, download them, and update TOML data files
+Translation and publishing are handled by cloud workflow
 Target utils version:
 workshop: 1.0.x
 config: 1.0.x
-file: 1.1.x
+file: 3.0.x
 steamcmd: 1.0.x
-git: 1.0.x
+helper: 1.0.x
+mod_target: 3.0.x
 """
 from util.workshop import *
-from util.translator import *
 from util.config import *
 from util.file import *
 from util.steamcmd import *
-from util.git import *
 from util.helper import *
 from util.mod_target import ModTarget
 import logging
-import shutil
 import os
 
+# Step 1: Initialize paths and configuration
 workpath = os.getcwd()
 config = Config(os.path.join(workpath, "config.toml"))
 game_mod_path = os.path.join(workpath, "steamcmd", "steamapps", "workshop", "content", str(config["workshop"]["game_id"]))
-git_path = os.path.join(workpath, "git")
-if not os.path.exists(git_path):
-    os.makedirs(git_path)
-if config["git"]["enabled"]:
-    git = Git(git_path, config["git"]["branch"])
-data_path = os.path.join(git_path, "data")
+data_path = os.path.join(workpath, "data")
 if not os.path.exists(data_path):
     os.makedirs(data_path)
-result_path = os.path.join(git_path, "mod")
-if os.path.exists(result_path):
-    shutil.rmtree(result_path)
-os.makedirs(result_path)
 
-# Basic logger setup
+# Step 2: Setup logger
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
@@ -54,38 +46,39 @@ console_handler.setFormatter(console_formatter)
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
-if config["git"]["enabled"]:
-    git.pull()
+logger.info("=" * 80)
+logger.info("Timberborn Mod Data Update Tool v3")
+logger.info("=" * 80)
 
-# Get the latest mods from the Steam Workshop
+# Step 3: Fetch new mods from Steam Workshop
+logger.info("Step 1: Fetching latest mods from Steam Workshop...")
 workshop = WorkshopNewMods(config["workshop"]["game_id"], config["workshop"]["text"])
 new_mods = workshop.get_mods(config["workshop"]["depth"])
 
-# Combine the new mods with the existing ones
+# Combine new mods with existing ones
+new_mod_count = 0
 for mod_id in new_mods:
     if mod_id not in config["workshop"]["ids"]:
         config["workshop"]["ids"].append(mod_id)
+        new_mod_count += 1
         logger.info(f"New mod found: {mod_id}")
+logger.info(f"Found {new_mod_count} new mods")
 
+# Remove blacklisted mods
 for black_id in config["workshop"]["blacklist_ids"]:
     if black_id in config["workshop"]["ids"]:
         config["workshop"]["ids"].remove(black_id)
         logger.info(f"Mod {black_id} is blacklisted and removed from the list")
 
-# Download the mods using steamcmd
+logger.info(f"Total mods to process: {len(config['workshop']['ids'])}")
+
+# Step 4: Download mods using steamcmd
+logger.info("Step 2: Downloading mods using SteamCMD...")
 steamClient = steamdownloader(config["steam"]["username"], os.path.join(workpath, "steamcmd"))
 steamClient.download(config["workshop"]["game_id"], config["workshop"]["ids"])
 
-# Load the translator
-if config["translator"]["type"] == "LLM":
-    translator = TranslatorLLM(config["translator"]["min_length"], config["translator"]["max_length"], config["translator"]["rate_limit"], config["translator"]["LLM_configs"])
-elif config["translator"]["type"] == "google":
-    translator = GoogleTranslator(config["translator"]["min_length"], config["translator"]["max_length"], config["translator"]["rate_limit"])
-else:
-    logger.error("Unsupported translator type")
-    exit(1)
-
-# Create ModTarget instances for each mod
+# Step 5: Create ModTarget instances for each mod
+logger.info("Step 3: Creating mod targets...")
 mod_targets = {}
 valid_mod_ids = []
 
@@ -98,13 +91,11 @@ for id in config["workshop"]["ids"]:
         logger.warning(f"Mod {id} cannot find any translation files")
         continue
     
-    # Create ModTarget instance
+    # Create ModTarget instance (no translator needed in v3)
     mod_target = ModTarget(
         mod_id=id,
         mod_name=mod_name,
-        mod_path=mod_path,
-        target_lang=config["translator"]["target_lang"],
-        translator=translator
+        mod_path=mod_path
     )
     
     # Add all versions to the ModTarget
@@ -118,27 +109,41 @@ for id in config["workshop"]["ids"]:
     else:
         logger.warning(f"Mod {id} has no valid versions")
 
-# Update the config with only valid mod IDs
+# Update config with only valid mod IDs
 config["workshop"]["ids"] = valid_mod_ids
 
-# Process each ModTarget
+# Step 6: Process each ModTarget to update data
+logger.info("Step 4: Updating TOML data files...")
+processed_count = 0
+error_count = 0
+
 for mod_id, mod_target in mod_targets.items():
-    logger.info(f"Processing mod {mod_id}: {mod_target.mod_name}")
-    
-    # Load historical data
-    mod_target.load_old_data(data_path)
-    
-    # Perform cross-version copying
-    mod_target.cross_version_copy()
-    
-    # Translate with enhanced context
-    mod_target.translate_all()
-    
-    # Save all version data
-    mod_target.save_all_data(data_path)
+    try:
+        logger.info(f"Processing mod {mod_id}: {mod_target.mod_name}")
+        
+        # Load historical data
+        mod_target.load_old_data(data_path)
+        
+        # Update data with change detection
+        mod_target.update_all_data()
+        
+        # Save all version data
+        mod_target.save_all_data(data_path)
+        
+        processed_count += 1
+    except Exception as e:
+        logger.error(f"Error processing mod {mod_id}: {e}")
+        error_count += 1
 
-if config["git"]["enabled"]:
-    git.pull()
-    git.push()
-
+# Step 7: Save configuration
+logger.info("Step 5: Saving configuration...")
 config.save_config()
+
+# Summary
+logger.info("=" * 80)
+logger.info("Processing complete!")
+logger.info(f"Mods processed: {processed_count}")
+logger.info(f"Errors: {error_count}")
+logger.info(f"Data files saved to: {data_path}")
+logger.info("Next: Cloud workflow will handle translation and publishing")
+logger.info("=" * 80)

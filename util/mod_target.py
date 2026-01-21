@@ -1,22 +1,21 @@
 """
-ModTarget class for managing mod translations across multiple versions
+ModTarget class for managing mod data updates across multiple versions (v3)
+No translation - only data preparation with change detection
 """
 import os
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 from .file import CSV_File
 
 logger = logging.getLogger(__name__)
 
 class ModTarget:
-    """管理单个mod的多个版本翻译"""
+    """管理单个mod的多个版本数据更新"""
     
-    def __init__(self, mod_id: str, mod_name: str, mod_path: str, target_lang: str, translator):
+    def __init__(self, mod_id: str, mod_name: str, mod_path: str):
         self.mod_id = mod_id
         self.mod_name = mod_name
         self.mod_path = mod_path
-        self.target_lang = target_lang
-        self.translator = translator
         self.versions: Dict[str, CSV_File] = {}
         self.version_priority: List[str] = []
         
@@ -26,9 +25,7 @@ class ModTarget:
             csv_file = CSV_File(
                 id=self.mod_id,
                 name=self.mod_name,
-                raw=raw_file_path,
-                target=self.target_lang,
-                translator=self.translator
+                raw=raw_file_path
             )
             self.versions[version] = csv_file
             self._update_version_priority(version)
@@ -71,13 +68,15 @@ class ModTarget:
                 self.versions[version].load_old_data(old_data_file)
                 logger.info(f"Loaded old data for {self.mod_id} version {version}")
     
-    def cross_version_copy(self):
-        """跨版本复制相同的键值对"""
-        if len(self.versions) <= 1:
-            return
-            
-        # 按优先级遍历版本
-        for i, source_version in enumerate(self.version_priority):
+    def update_all_data(self):
+        """更新所有版本的数据 (v3: 只进行数据对比，不翻译)"""
+        for version in self.version_priority:
+            if version not in self.versions:
+                continue
+                
+            csv_file = self.versions[version]
+            logger.info(f"Updating data for mod {self.mod_id} version {version}")
+            csv_file.update_data()
             if source_version not in self.versions:
                 continue
                 
@@ -125,23 +124,6 @@ class ModTarget:
         auxiliary_info = {}
         
         for version in self.version_priority:
-            if version == current_version or version not in self.versions:
-                continue
-                
-            other_file = self.versions[version]
-            other_data = other_file.get_translation_data()
-            
-            for key, translation_info in other_data.items():
-                if key not in auxiliary_info:
-                    auxiliary_info[key] = []
-                auxiliary_info[key].append({
-                    'version': version,
-                    'raw': translation_info.get('raw', ''),
-                    'translation': translation_info.get('translation', ''),
-                    'auxiliary_lang': translation_info.get('auxiliary_lang', '')
-                })
-        
-        return auxiliary_info
     
     def save_all_data(self, data_path: str):
         """保存所有版本的数据"""
