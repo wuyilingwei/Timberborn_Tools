@@ -8,7 +8,7 @@ import logging
 import toml
 from typing import Dict, List, Tuple
 from collections import OrderedDict
-from .file import CSV_File
+from .file import CSV_File, reorder_entry_fields
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +159,8 @@ class ModTarget:
                         if isinstance(merged_value, dict):
                             # Add status field to mark this key as coming from an older version
                             merged_value['status'] = 'old'
+                            # Reorder fields: raw, new, status, language codes
+                            merged_value = reorder_entry_fields(merged_value)
                         merged[key] = merged_value
                         added_count += 1
                 
