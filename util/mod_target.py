@@ -141,7 +141,7 @@ class ModTarget:
                         merged[key] = value
                     logger.info(f"Merged version {latest_version}")
         
-        # Now merge unique keys from older versions and mark them with "old"
+        # Now merge unique keys from older versions and mark them with status
         for version in self.version_priority[1:]:  # Skip latest version
             if version in self.old_version_data:
                 old_data = self.old_version_data[version]
@@ -154,16 +154,16 @@ class ModTarget:
                     
                     # Only add if key doesn't exist in merged data
                     if key not in merged:
-                        # Create a copy and add "old" marker
+                        # Create a copy and add status marker
                         merged_value = OrderedDict(value) if isinstance(value, dict) else value
                         if isinstance(merged_value, dict):
-                            # Add "old" field to mark this key as coming from an older version
-                            merged_value['old'] = True
+                            # Add status field to mark this key as coming from an older version
+                            merged_value['status'] = 'old'
                         merged[key] = merged_value
                         added_count += 1
                 
                 if added_count > 0:
-                    logger.info(f"Added {added_count} unique keys from version {version} (marked as 'old')")
+                    logger.info(f"Added {added_count} unique keys from version {version} (status: old)")
         
         return merged
     

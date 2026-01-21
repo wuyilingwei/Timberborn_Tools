@@ -133,23 +133,23 @@ class CSV_File:
                 self.logger.info(f"New key '{key}' added with value '{new_value}'")
         
         # Preserve keys from old data that are not in new raw data
-        # Mark them as "Abandoned" if they weren't already marked as "old"
+        # Set status field based on whether key was from older version
         for key in self.old_data:
             if key not in ['name', 'field_prompt'] and key not in self.data:
                 old_entry = self.old_data[key]
                 if isinstance(old_entry, dict):
-                    # Check if this key was marked as "old" (from older version)
-                    if 'old' not in old_entry:
+                    # Check if this key already has status "old" (from older version)
+                    if old_entry.get('status') != 'old':
                         # This key was in the latest version but no longer exists in raw data
-                        # Mark it as "Abandoned"
+                        # Set status to "Abandoned"
                         entry_copy = OrderedDict(old_entry)
-                        entry_copy['Abandoned'] = True
+                        entry_copy['status'] = 'Abandoned'
                         self.data[key] = entry_copy
-                        self.logger.info(f"Key '{key}' marked as Abandoned (no longer in raw data)")
+                        self.logger.info(f"Key '{key}' status: Abandoned (no longer in raw data)")
                     else:
-                        # This key was from an older version, keep as-is
+                        # This key was from an older version, keep as-is with status "old"
                         self.data[key] = old_entry
-                        self.logger.debug(f"Preserved old key '{key}' from older version")
+                        self.logger.debug(f"Preserved old key '{key}' from older version (status: old)")
                 else:
                     self.data[key] = old_entry
                     self.logger.debug(f"Preserved key '{key}' (not in new raw data)")
