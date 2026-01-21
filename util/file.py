@@ -21,11 +21,6 @@ class CSV_File:
     Handles data comparison and change detection
     No translation - only data preparation for cloud workflow
     """
-    id: int
-    old_data: dict[str, dict]
-    data: dict[str, dict]
-    new_raw_data: dict[str, str]
-    logger: logging.Logger
 
     def __init__(self, id: int, name: str, raw: str) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -142,38 +137,3 @@ class CSV_File:
             if key not in ['name', 'field_prompt'] and key not in self.data:
                 self.data[key] = self.old_data[key]
                 self.logger.debug(f"Preserved old key '{key}' (not in new raw data)")
-
-
-    def transfer_data(self) -> dict[str, dict]:
-        for lang in self.target:
-            # for each language
-            if lang == 'raw':
-                continue
-            for key, values in self.data.items():
-                # check if the key is in old data and the value is the same
-                if key in self.old_data and lang in self.old_data[key] and values['raw'].replace('\u00A0', ' ') == self.old_data[key]['raw']:
-                    self.data[key][lang] = self.old_data[key][lang]
-                    self.logger.info(f"Matched {values['raw']} to {lang}: {self.data[key][lang]}")
-                else:
-                    try:
-                        # check if the value is empty
-                        max_retries = 3
-                        while max_retries > 0:
-                            result = self.translator.translate(values['raw'], lang)
-                            self.logger.debug(f"Translation result: {result}")
-                            if result["code"] == 200:
-                                break
-                            else:
-                                max_retries -= 1
-                                self.logger.warning(f"Retrying translation for {values['raw']} to {lang}, attempts left: {max_retries}")
-                        if max_retries == 0 and result["code"] != 200:
-                            self.logger.error(f"Translation failed for {values['raw']} to {lang}: {result['text']}")
-                            self.data[key][lang] = values['raw']
-                            raise Exception("Max retries exceeded")
-                        self.data[key][lang] = result["text"]
-                    except Exception as e:
-                        self.logger.error(f"Error translating {values['raw']} to {lang}: {e}")
-                        self.data[key][lang] = values['raw']
-        self.logger.info("Data transfer completed")
-        self.logger.debug(f"Final Data: {self.data}")
-        return self.data
