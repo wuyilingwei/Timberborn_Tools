@@ -77,7 +77,9 @@ class ModTarget:
                     self.old_version_data['single'] = toml.load(f, _dict=OrderedDict)
                 logger.info(f"Loaded old single-file data for {self.mod_id}")
             except Exception as e:
-                logger.error(f"Error loading old single-file data: {e}")
+                msg = f"Failed to load old single-file data for {self.mod_id} from {old_data_file}: {e}"
+                logger.error(msg)
+                raise RuntimeError(msg)
         
         # Also load old multi-version format files for migration
         for version in self.versions:
@@ -88,7 +90,9 @@ class ModTarget:
                         self.old_version_data[version] = toml.load(f, _dict=OrderedDict)
                     logger.info(f"Loaded old data for {self.mod_id} version {version}")
                 except Exception as e:
-                    logger.error(f"Error loading old data for version {version}: {e}")
+                    msg = f"Failed to load old data for {self.mod_id} version {version} from {old_data_file}: {e}"
+                    logger.error(msg)
+                    raise RuntimeError(msg)
     
     def update_all_data(self):
         """更新数据：只使用最新版本，合并旧版本的独立键值对"""

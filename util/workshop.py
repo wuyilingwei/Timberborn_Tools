@@ -53,13 +53,13 @@ class WorkshopNewMods:
             url = (f'https://steamcommunity.com/workshop/browse/'
                    f'?appid={self.game_id}&browsesort=mostrecent'
                    f'&requiredtags%5B%5D={self.text}&p={i}')
-            logging.info(f'Getting mods from page {i}')
+            self.logger.info(f'Getting mods from page {i}')
             response = requests.get(url, headers=self.headers)
             if response.status_code == 200:
                 response_to_ids(response)
             else:
-                logging.warning(f'Failed to get mods from page {i}')
-        logging.info(f'Got {self.ids}')
+                self.logger.warning(f'Failed to get mods from page {i}')
+        self.logger.info(f'Got {len(self.ids)} mod IDs from {depth} pages')
         return self.ids
 
 

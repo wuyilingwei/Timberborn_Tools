@@ -101,7 +101,8 @@ valid_mod_ids = []
 for id in config["workshop"]["ids"]:
     mod_path = os.path.join(game_mod_path, id)
     mod_name = parse_mod_info(os.path.join(mod_path, "workshop_data.json"))
-    support_versions = search_versions(mod_path)
+    versions = search_versions(mod_path)
+    support_versions = search_file(mod_path, versions, keyword="en")
 
     if support_versions == {} or support_versions is None:
         logger.warning(f"Mod {id} cannot find any translation files")
