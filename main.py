@@ -3,7 +3,7 @@ version: 3.0.0
 author: Wuyilingwei
 Main script for the mod data update tool
 Focus: Fetch new mods, download them, and update TOML data files
-Translation and publishing are handled by cloud workflow
+Translation handled by cloud workflow, but git operations for data repository remain
 Target utils version:
 workshop: 1.0.x
 config: 1.0.x
@@ -11,12 +11,14 @@ file: 3.0.x
 steamcmd: 1.0.x
 helper: 1.0.x
 mod_target: 3.0.x
+git: 1.0.x
 """
 from util.workshop import *
 from util.config import *
 from util.file import *
 from util.steamcmd import *
 from util.helper import *
+from util.git import *
 from util.mod_target import ModTarget
 import logging
 import os
@@ -25,7 +27,14 @@ import os
 workpath = os.getcwd()
 config = Config(os.path.join(workpath, "config.toml"))
 game_mod_path = os.path.join(workpath, "steamcmd", "steamapps", "workshop", "content", str(config["workshop"]["game_id"]))
-data_path = os.path.join(workpath, "data")
+
+# Setup git paths
+git_path = os.path.join(workpath, "git")
+if not os.path.exists(git_path):
+    os.makedirs(git_path)
+if config["git"]["enabled"]:
+    git = Git(git_path, config["git"]["branch"])
+data_path = os.path.join(git_path, "data")
 if not os.path.exists(data_path):
     os.makedirs(data_path)
 
@@ -50,7 +59,12 @@ logger.info("=" * 80)
 logger.info("Timberborn Mod Data Update Tool v3")
 logger.info("=" * 80)
 
-# Step 3: Fetch new mods from Steam Workshop
+# Step 3: Pull data repository if git enabled
+if config["git"]["enabled"]:
+    logger.info("Step 0: Pulling data repository...")
+    git.pull()
+
+# Step 4: Fetch new mods from Steam Workshop
 logger.info("Step 1: Fetching latest mods from Steam Workshop...")
 workshop = WorkshopNewMods(config["workshop"]["game_id"], config["workshop"]["text"])
 new_mods = workshop.get_mods(config["workshop"]["depth"])
@@ -138,6 +152,12 @@ for mod_id, mod_target in mod_targets.items():
 # Step 7: Save configuration
 logger.info("Step 5: Saving configuration...")
 config.save_config()
+
+# Step 8: Push data repository if git enabled
+if config["git"]["enabled"]:
+    logger.info("Step 6: Pushing updated data to repository...")
+    git.pull()  # Pull first to avoid conflicts
+    git.push()
 
 # Summary
 logger.info("=" * 80)
