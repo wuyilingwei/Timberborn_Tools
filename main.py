@@ -59,12 +59,12 @@ logger.info("=" * 80)
 logger.info("Timberborn Mod Data Update Tool v3")
 logger.info("=" * 80)
 
-# Step 3: Pull data repository if git enabled
+# Pull data repository if git enabled
 if config["git"]["enabled"]:
     logger.info("Step 0: Pulling data repository...")
     git.pull()
 
-# Step 4: Fetch new mods from Steam Workshop
+# Fetch new mods from Steam Workshop
 logger.info("Step 1: Fetching latest mods from Steam Workshop...")
 workshop = WorkshopNewMods(config["workshop"]["game_id"], config["workshop"]["text"])
 new_mods = workshop.get_mods(config["workshop"]["depth"])
@@ -86,12 +86,12 @@ for black_id in config["workshop"]["blacklist_ids"]:
 
 logger.info(f"Total mods to process: {len(config['workshop']['ids'])}")
 
-# Step 4: Download mods using steamcmd
+# Download mods using steamcmd
 logger.info("Step 2: Downloading mods using SteamCMD...")
 steamClient = steamdownloader(config["steam"]["username"], os.path.join(workpath, "steamcmd"))
 steamClient.download(config["workshop"]["game_id"], config["workshop"]["ids"])
 
-# Step 5: Create ModTarget instances for each mod
+# Create ModTarget instances for each mod
 logger.info("Step 3: Creating mod targets...")
 mod_targets = {}
 valid_mod_ids = []
@@ -126,7 +126,7 @@ for id in config["workshop"]["ids"]:
 # Update config with only valid mod IDs
 config["workshop"]["ids"] = valid_mod_ids
 
-# Step 6: Process each ModTarget to update data
+# Process each ModTarget to update data
 logger.info("Step 4: Updating TOML data files...")
 processed_count = 0
 error_count = 0
@@ -149,11 +149,11 @@ for mod_id, mod_target in mod_targets.items():
         logger.error(f"Error processing mod {mod_id}: {e}")
         error_count += 1
 
-# Step 7: Save configuration
+# Save configuration
 logger.info("Step 5: Saving configuration...")
 config.save_config()
 
-# Step 8: Push data repository if git enabled
+# Push data repository if git enabled
 if config["git"]["enabled"]:
     logger.info("Step 6: Pushing updated data to repository...")
     git.pull()  # Pull first to avoid conflicts
