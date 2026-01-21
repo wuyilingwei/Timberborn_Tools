@@ -16,7 +16,7 @@ V3 focuses on mod data preparation for cloud-based translation workflows.
 
 1. Install dependencies:
    ```bash
-   pip install -r requirments.txt
+   pip install -r requirements.txt
    ```
 
 2. Configure `config.toml` (copy from `config.toml.example`)

@@ -72,7 +72,7 @@ python main_v3.py
 
 1. Install dependencies:
    ```bash
-   pip install -r requirments.txt
+   pip install -r requirements.txt
    ```
 
 2. Configure `config.toml` (copy from `config.toml.example`):
