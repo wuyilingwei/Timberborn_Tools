@@ -145,17 +145,25 @@ class CSV_File:
                     # Add 'new' field to indicate retranslation needed
                     temp_entry['new'] = new_value
                     
+                    # Ensure status field exists (keep existing or set to "normal")
+                    if 'status' not in temp_entry:
+                        temp_entry['status'] = 'normal'
+                    
                     # Reorder fields: raw, new, status, language codes
                     self.data[key] = reorder_entry_fields(temp_entry)
                     
                     self.logger.info(f"Updated key '{key}': value changed from '{old_raw}' to '{new_value}'")
                 else:
-                    # Value unchanged - keep as-is, but reorder fields
-                    self.data[key] = reorder_entry_fields(old_entry.copy())
+                    # Value unchanged - keep as-is, but ensure status and reorder fields
+                    temp_entry = old_entry.copy()
+                    if 'status' not in temp_entry:
+                        temp_entry['status'] = 'normal'
+                    self.data[key] = reorder_entry_fields(temp_entry)
             else:
-                # New key - create with 'new' field only
+                # New key - create with 'new' field and status
                 self.data[key] = OrderedDict()
                 self.data[key]['new'] = new_value
+                self.data[key]['status'] = 'normal'
                 self.logger.info(f"New key '{key}' added with value '{new_value}'")
         
         # Preserve keys from old data that are not in new raw data
