@@ -77,53 +77,6 @@ class ModTarget:
             csv_file = self.versions[version]
             logger.info(f"Updating data for mod {self.mod_id} version {version}")
             csv_file.update_data()
-            if source_version not in self.versions:
-                continue
-                
-            source_file = self.versions[source_version]
-            source_data = source_file.get_translation_data()
-            
-            # 向优先级较低的版本复制
-            for target_version in self.version_priority[i+1:]:
-                if target_version not in self.versions:
-                    continue
-                    
-                target_file = self.versions[target_version]
-                target_raw_data = target_file.get_raw_data()
-                
-                copied_count = 0
-                for key, source_info in source_data.items():
-                    if key in target_raw_data:
-                        target_raw = target_raw_data[key]
-                        source_raw = source_info.get('raw', '')
-                        
-                        # 如果原始文本相同且目标版本没有翻译
-                        if (target_raw == source_raw and 
-                            not target_file.has_translation(key)):
-                            target_file.copy_translation(key, source_info)
-                            copied_count += 1
-                
-                if copied_count > 0:
-                    logger.info(f"Copied {copied_count} translations from {source_version} to {target_version} for mod {self.mod_id}")
-    
-    def translate_all(self):
-        """翻译所有版本，使用增强的上下文信息"""
-        for version in self.version_priority:
-            if version not in self.versions:
-                continue
-                
-            csv_file = self.versions[version]
-            logger.info(f"Translating mod {self.mod_id} version {version}")
-            
-            # 获取辅助翻译信息
-            auxiliary_info = self._get_auxiliary_translation_info(version)
-            csv_file.translate_with_context(auxiliary_info)
-    
-    def _get_auxiliary_translation_info(self, current_version: str) -> Dict:
-        """获取辅助翻译信息（其他版本的翻译结果）"""
-        auxiliary_info = {}
-        
-        for version in self.version_priority:
     
     def save_all_data(self, data_path: str):
         """保存所有版本的数据"""
@@ -134,3 +87,4 @@ class ModTarget:
     def has_valid_versions(self) -> bool:
         """检查是否有有效的版本"""
         return len(self.versions) > 0
+
