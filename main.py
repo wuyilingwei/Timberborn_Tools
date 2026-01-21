@@ -1,16 +1,17 @@
 """
-version: 3.0.0
+version: 3.1.0
 author: Wuyilingwei
 Main script for the mod data update tool
 Focus: Fetch new mods, download them, and update TOML data files
 Translation handled by cloud workflow, but git operations for data repository remain
+Single-version tracking: Only keep latest version, merge unique keys from older versions
 Target utils version:
 workshop: 1.0.x
 config: 1.0.x
 file: 3.0.x
 steamcmd: 1.0.x
 helper: 1.0.x
-mod_target: 3.0.x
+mod_target: 3.1.x
 git: 1.0.x
 """
 from util.workshop import *
@@ -56,7 +57,8 @@ logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
 logger.info("=" * 80)
-logger.info("Timberborn Mod Data Update Tool v3")
+logger.info("Timberborn Mod Data Update Tool v3.1")
+logger.info("Single-version tracking with old version key merging")
 logger.info("=" * 80)
 
 # Pull data repository if git enabled
@@ -135,13 +137,13 @@ for mod_id, mod_target in mod_targets.items():
     try:
         logger.info(f"Processing mod {mod_id}: {mod_target.mod_name}")
         
-        # Load historical data
+        # Load historical data (both single-file and multi-version formats for migration)
         mod_target.load_old_data(data_path)
         
-        # Update data with change detection
+        # Update data with change detection (uses latest version, merges old unique keys)
         mod_target.update_all_data()
         
-        # Save all version data
+        # Save single version data (without version suffix)
         mod_target.save_all_data(data_path)
         
         processed_count += 1

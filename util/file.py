@@ -14,6 +14,28 @@ import logging
 from collections import OrderedDict
 
 
+def reorder_entry_fields(entry: OrderedDict) -> OrderedDict:
+    """
+    Reorder fields in entry to: raw, new, status, then language codes
+    """
+    if not isinstance(entry, dict):
+        return entry
+    
+    ordered = OrderedDict()
+    
+    # Priority order: raw, new, status
+    for field in ['raw', 'new', 'status']:
+        if field in entry:
+            ordered[field] = entry[field]
+    
+    # Then all other fields (language codes and others)
+    for field, value in entry.items():
+        if field not in ['raw', 'new', 'status']:
+            ordered[field] = value
+    
+    return ordered
+
+
 
 class CSV_File:
     """
@@ -115,25 +137,53 @@ class CSV_File:
                 if old_raw != new_value:
                     # Value changed - add 'new' field
                     # Copy all existing fields except old 'new' field
+                    temp_entry = OrderedDict()
                     for field, value in old_entry.items():
                         if field != 'new':
-                            self.data[key][field] = value
+                            temp_entry[field] = value
                     
                     # Add 'new' field to indicate retranslation needed
-                    self.data[key]['new'] = new_value
+                    temp_entry['new'] = new_value
+                    
+                    # Ensure status field exists (keep existing or set to "normal")
+                    if 'status' not in temp_entry:
+                        temp_entry['status'] = 'normal'
+                    
+                    # Reorder fields: raw, new, status, language codes
+                    self.data[key] = reorder_entry_fields(temp_entry)
                     
                     self.logger.info(f"Updated key '{key}': value changed from '{old_raw}' to '{new_value}'")
                 else:
-                    # Value unchanged - keep as-is
-                    self.data[key] = old_entry.copy()
+                    # Value unchanged - keep as-is, but ensure status and reorder fields
+                    temp_entry = old_entry.copy()
+                    if 'status' not in temp_entry:
+                        temp_entry['status'] = 'normal'
+                    self.data[key] = reorder_entry_fields(temp_entry)
             else:
-                # New key - create with 'new' field only
+                # New key - create with 'new' field and status
                 self.data[key] = OrderedDict()
                 self.data[key]['new'] = new_value
+                self.data[key]['status'] = 'normal'
                 self.logger.info(f"New key '{key}' added with value '{new_value}'")
         
         # Preserve keys from old data that are not in new raw data
+        # Set status field based on whether key was from older version
         for key in self.old_data:
             if key not in ['name', 'field_prompt'] and key not in self.data:
-                self.data[key] = self.old_data[key]
-                self.logger.debug(f"Preserved old key '{key}' (not in new raw data)")
+                old_entry = self.old_data[key]
+                if isinstance(old_entry, dict):
+                    # Check if this key already has status "old" (from older version)
+                    if old_entry.get('status') != 'old':
+                        # This key was in the latest version but no longer exists in raw data
+                        # Set status to "abandoned"
+                        entry_copy = OrderedDict(old_entry)
+                        entry_copy['status'] = 'abandoned'
+                        self.data[key] = reorder_entry_fields(entry_copy)
+                        self.logger.info(f"Key '{key}' status: abandoned (no longer in raw data)")
+                    else:
+                        # This key was from an older version, keep as-is with status "old"
+                        self.data[key] = reorder_entry_fields(old_entry)
+                        self.logger.debug(f"Preserved old key '{key}' from older version (status: old)")
+                else:
+                    self.data[key] = old_entry
+                    self.logger.debug(f"Preserved key '{key}' (not in new raw data)")
