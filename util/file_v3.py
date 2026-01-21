@@ -9,7 +9,6 @@ import os
 import csv
 import toml
 import logging
-from typing import Dict, Any
 from collections import OrderedDict
 
 
@@ -41,7 +40,10 @@ class TomlFile:
                         continue
                     key = row[0]
                     # Skip header and comment rows
-                    if key in ['id', 'ID'] or (len(row) > 2 and 'Comment' in str(row[2])):
+                    if key in ['id', 'ID']:
+                        continue
+                    # Skip comment rows based on the Comment column
+                    if len(row) > 2 and row[2].strip().lower() == 'comment':
                         continue
                     if len(row) > 1:
                         values = row[1:]
@@ -96,23 +98,13 @@ class TomlFile:
                 
                 if old_raw != new_value:
                     # Value changed - add 'new' field
-                    # First copy existing fields
+                    # Copy all existing fields except old 'new' field
                     for field, value in old_entry.items():
-                        if field != 'new':  # Don't copy old 'new' field
+                        if field != 'new':
                             self.updated_data[key][field] = value
                     
-                    # Add 'new' field after 'raw' if 'raw' exists
-                    if 'raw' in self.updated_data[key]:
-                        # Reorder to put 'new' after 'raw'
-                        temp = OrderedDict()
-                        for k, v in self.updated_data[key].items():
-                            temp[k] = v
-                            if k == 'raw':
-                                temp['new'] = new_value
-                        self.updated_data[key] = temp
-                    else:
-                        # No 'raw' field, just add 'new'
-                        self.updated_data[key]['new'] = new_value
+                    # Add 'new' field to indicate retranslation needed
+                    self.updated_data[key]['new'] = new_value
                     
                     self.logger.info(f"Updated key '{key}': value changed from '{old_raw}' to '{new_value}'")
                 else:
