@@ -133,7 +133,23 @@ class CSV_File:
                 self.logger.info(f"New key '{key}' added with value '{new_value}'")
         
         # Preserve keys from old data that are not in new raw data
+        # Mark them as "Abandoned" if they weren't already marked as "old"
         for key in self.old_data:
             if key not in ['name', 'field_prompt'] and key not in self.data:
-                self.data[key] = self.old_data[key]
-                self.logger.debug(f"Preserved old key '{key}' (not in new raw data)")
+                old_entry = self.old_data[key]
+                if isinstance(old_entry, dict):
+                    # Check if this key was marked as "old" (from older version)
+                    if 'old' not in old_entry:
+                        # This key was in the latest version but no longer exists in raw data
+                        # Mark it as "Abandoned"
+                        entry_copy = OrderedDict(old_entry)
+                        entry_copy['Abandoned'] = True
+                        self.data[key] = entry_copy
+                        self.logger.info(f"Key '{key}' marked as Abandoned (no longer in raw data)")
+                    else:
+                        # This key was from an older version, keep as-is
+                        self.data[key] = old_entry
+                        self.logger.debug(f"Preserved old key '{key}' from older version")
+                else:
+                    self.data[key] = old_entry
+                    self.logger.debug(f"Preserved key '{key}' (not in new raw data)")

@@ -119,7 +119,7 @@ class ModTarget:
         self.versions[latest_version] = latest_csv
     
     def _merge_old_version_data(self) -> OrderedDict:
-        """合并所有旧版本数据：以最新版本为基础，添加旧版本的独立键值对"""
+        """合并所有旧版本数据：以最新版本为基础，添加旧版本的独立键值对并标记"""
         merged = OrderedDict()
         
         # Start with single-file format if it exists (use OrderedDict constructor for proper copying)
@@ -141,7 +141,7 @@ class ModTarget:
                         merged[key] = value
                     logger.info(f"Merged version {latest_version}")
         
-        # Now merge unique keys from older versions (process from older to newer, so newer values overwrite)
+        # Now merge unique keys from older versions and mark them with "old"
         for version in self.version_priority[1:]:  # Skip latest version
             if version in self.old_version_data:
                 old_data = self.old_version_data[version]
@@ -154,11 +154,16 @@ class ModTarget:
                     
                     # Only add if key doesn't exist in merged data
                     if key not in merged:
-                        merged[key] = value
+                        # Create a copy and add "old" marker
+                        merged_value = OrderedDict(value) if isinstance(value, dict) else value
+                        if isinstance(merged_value, dict):
+                            # Add "old" field to mark this key as coming from an older version
+                            merged_value['old'] = True
+                        merged[key] = merged_value
                         added_count += 1
                 
                 if added_count > 0:
-                    logger.info(f"Added {added_count} unique keys from version {version}")
+                    logger.info(f"Added {added_count} unique keys from version {version} (marked as 'old')")
         
         return merged
     
