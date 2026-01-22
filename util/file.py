@@ -72,6 +72,7 @@ class CSV_File:
                     if len(row) > 2 and row[2].strip().lower() == 'comment':
                         continue
                     # Skip keys containing '//' as they are used as separators
+                    # Note: This checks for '//' anywhere in the key string
                     if '//' in key:
                         self.logger.debug(f"Skipping key '{key}' containing '//' (separator)")
                         continue
@@ -125,7 +126,7 @@ class CSV_File:
             
             modified = False
             for key in saved_data:
-                if key in ['_meta']:
+                if key == '_meta':
                     continue
                 entry = saved_data[key]
                 if isinstance(entry, dict) and 'new' in entry and 'raw' in entry:
