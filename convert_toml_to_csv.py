@@ -38,12 +38,15 @@ def convert_toml_to_csv(data_dir, mod_dir):
                 with open(toml_path, "r", encoding="utf-8") as toml_file:
                     data = toml.load(toml_file)
                 
-                # 收集所有语言代码
+                # 收集所有语言代码 (排除 _meta 和其他元数据字段)
                 all_languages = set()
                 for key, translations in data.items():
+                    # Skip _meta section
+                    if key == '_meta':
+                        continue
                     if isinstance(translations, dict):
                         for lang_code in translations.keys():
-                            if lang_code != "raw":
+                            if lang_code not in ['raw', 'new', 'status']:
                                 all_languages.add(lang_code)
                 
                 # 为每种语言生成 CSV 文件
@@ -58,8 +61,11 @@ def convert_toml_to_csv(data_dir, mod_dir):
                         writer = csv.writer(csv_file)
                         writer.writerow(["ID", "Text", "Comment"])
                         
-                        # 遍历所有翻译条目
+                        # 遍历所有翻译条目 (跳过 _meta 和 name/field_prompt)
                         for translation_key, translations in data.items():
+                            # Skip _meta section and old-style metadata
+                            if translation_key in ['_meta', 'name', 'field_prompt']:
+                                continue
                             if isinstance(translations, dict) and lang_code in translations:
                                 translation_text = translations[lang_code]
                                 # 检查空字符串并输出警告
