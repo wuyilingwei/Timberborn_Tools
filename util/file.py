@@ -71,6 +71,10 @@ class CSV_File:
                     # Skip comment rows based on the Comment column
                     if len(row) > 2 and row[2].strip().lower() == 'comment':
                         continue
+                    # Skip keys containing '//' as they are used as separators
+                    if '//' in key:
+                        self.logger.debug(f"Skipping key '{key}' containing '//' (separator)")
+                        continue
                     if len(row) > 1:
                         values = row[1:]
                         self.new_raw_data[key] = values[0] if values[0] else ""
@@ -103,29 +107,66 @@ class CSV_File:
             with open(file_path, 'w', encoding='utf-8') as file:
                 toml.dump(self.data, file)
             self.logger.info(f"Saved data to {file_path}")
+            
+            # Perform round-trip comparison for keys with 'new' field
+            self._remove_identical_new_values(file_path)
         except Exception as e:
             self.logger.error(f"Error saving data to {file_path}: {e}")
+    
+    def _remove_identical_new_values(self, file_path: str) -> None:
+        """
+        Read back the saved TOML file and compare 'new' and 'raw' values.
+        If they are identical after TOML round-trip, remove the 'new' field.
+        """
+        try:
+            # Read back the file
+            with open(file_path, 'r', encoding='utf-8') as file:
+                saved_data = toml.load(file, _dict=OrderedDict)
+            
+            modified = False
+            for key in saved_data:
+                if key in ['_meta']:
+                    continue
+                entry = saved_data[key]
+                if isinstance(entry, dict) and 'new' in entry and 'raw' in entry:
+                    # Compare after round-trip
+                    if entry['new'] == entry['raw']:
+                        del entry['new']
+                        modified = True
+                        self.logger.info(f"Removed 'new' field for key '{key}': identical to 'raw' after TOML round-trip")
+            
+            # Save back if modified
+            if modified:
+                with open(file_path, 'w', encoding='utf-8') as file:
+                    toml.dump(saved_data, file)
+                self.logger.info(f"Updated {file_path} after round-trip comparison")
+        except Exception as e:
+            self.logger.error(f"Error in round-trip comparison for {file_path}: {e}")
 
     def update_data(self) -> None:
         """
         Update data according to v3 requirements:
-        - Add/update 'name' field with mod name
+        - Add/update '_meta' section with 'name' and 'field_prompt' fields
         - For new keys: create with 'new' field only
         - For existing keys with changed raw: add 'new' field alongside existing data
         - For unchanged keys: keep as-is
-        - Preserve 'prompt' and 'field_prompt' fields
+        - Preserve 'prompt' fields in individual entries
         """
         self.data = OrderedDict()
         
-        # Always update name field to current mod name
-        self.data['name'] = self.name
+        # Create _meta section for metadata
+        self.data['_meta'] = OrderedDict()
+        self.data['_meta']['name'] = self.name
         
-        # Preserve field_prompt if it exists
+        # Preserve field_prompt if it exists in old data
         if 'field_prompt' in self.old_data:
-            self.data['field_prompt'] = self.old_data['field_prompt']
+            self.data['_meta']['field_prompt'] = self.old_data['field_prompt']
+        elif '_meta' in self.old_data and isinstance(self.old_data['_meta'], dict) and 'field_prompt' in self.old_data['_meta']:
+            self.data['_meta']['field_prompt'] = self.old_data['_meta']['field_prompt']
         
         # Process each key from raw data
         for key, new_value in self.new_raw_data.items():
+            # Check both regular key and _meta section for existing data
             if key in self.old_data and isinstance(self.old_data[key], dict):
                 # Key exists in old data
                 old_entry = self.old_data[key]
@@ -169,7 +210,7 @@ class CSV_File:
         # Preserve keys from old data that are not in new raw data
         # Set status field based on whether key was from older version
         for key in self.old_data:
-            if key not in ['name', 'field_prompt'] and key not in self.data:
+            if key not in ['name', 'field_prompt', '_meta'] and key not in self.data:
                 old_entry = self.old_data[key]
                 if isinstance(old_entry, dict):
                     # Check if this key already has status "old" (from older version)

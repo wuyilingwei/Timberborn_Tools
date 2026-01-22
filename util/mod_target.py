@@ -152,8 +152,8 @@ class ModTarget:
                 added_count = 0
                 
                 for key, value in old_data.items():
-                    # Skip meta fields
-                    if key in ['name', 'field_prompt']:
+                    # Skip meta fields (both old and new format)
+                    if key in ['name', 'field_prompt', '_meta']:
                         continue
                     
                     # Only add if key doesn't exist in merged data
