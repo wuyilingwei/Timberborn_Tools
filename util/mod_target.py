@@ -152,8 +152,19 @@ class ModTarget:
                 added_count = 0
                 
                 for key, value in old_data.items():
-                    # Skip meta fields (both old and new format)
-                    if key in ['name', 'field_prompt', '_meta']:
+                    # Skip meta fields (both old and new format) except for _meta itself
+                    if key in ['name', 'field_prompt']:
+                        continue
+                    
+                    # Handle _meta fields specially - merge subfields
+                    if key == '_meta' and isinstance(value, dict):
+                        if '_meta' not in merged:
+                            merged['_meta'] = OrderedDict()
+                        # Merge _meta subfields, but don't override name and field_prompt
+                        for meta_key, meta_value in value.items():
+                            if meta_key not in ['name', 'field_prompt'] and meta_key not in merged['_meta']:
+                                merged['_meta'][meta_key] = meta_value
+                                added_count += 1
                         continue
                     
                     # Only add if key doesn't exist in merged data

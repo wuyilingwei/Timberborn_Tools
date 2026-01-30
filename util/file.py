@@ -11,6 +11,7 @@ import os
 import csv
 import toml
 import logging
+import re
 from collections import OrderedDict
 
 
@@ -53,6 +54,13 @@ class CSV_File:
         self.new_raw_data = {}
         self.load_raw(raw)
 
+    def is_valid_key(self, key: str) -> bool:
+        """Validate if key contains only legal characters: A-Z, a-z, and ."""
+        if not key or not isinstance(key, str):
+            return False
+        # Only allow A-Z, a-z, and . characters
+        return bool(re.match(r'^[A-Za-z.]+$', key))
+
     def load_raw(self, path: str) -> None:
         """Load raw CSV file from mod"""
         try:
@@ -75,6 +83,10 @@ class CSV_File:
                     # Note: This checks for '//' anywhere in the key string
                     if '//' in key:
                         self.logger.debug(f"Skipping key '{key}' containing '//' (separator)")
+                        continue
+                    # Skip keys with invalid characters (only allow A-Z, a-z, and .)
+                    if not self.is_valid_key(key):
+                        self.logger.debug(f"Skipping key '{key}' with invalid characters (only A-Z, a-z, . allowed)")
                         continue
                     if len(row) > 1:
                         values = row[1:]
@@ -147,23 +159,47 @@ class CSV_File:
     def update_data(self) -> None:
         """
         Update data according to v3 requirements:
-        - Add/update '_meta' section with 'name' and 'field_prompt' fields
+        - Add/update '_meta' section with 'name' and 'field_prompt' fields, preserve other _meta subfields
         - For new keys: create with 'new' field only
         - For existing keys with changed raw: add 'new' field alongside existing data
         - For unchanged keys: keep as-is
         - Preserve 'prompt' fields in individual entries
+        - If data acquisition fails (empty new_raw_data), preserve existing _meta completely
         """
         self.data = OrderedDict()
         
-        # Create _meta section for metadata
-        self.data['_meta'] = OrderedDict()
-        self.data['_meta']['name'] = self.name
+        # Handle _meta section for metadata
+        if '_meta' in self.old_data and isinstance(self.old_data['_meta'], dict):
+            # Start with existing _meta data to preserve all subfields
+            self.data['_meta'] = OrderedDict(self.old_data['_meta'])
+        else:
+            # Create new _meta section if it doesn't exist
+            self.data['_meta'] = OrderedDict()
         
-        # Preserve field_prompt if it exists in old data
-        if 'field_prompt' in self.old_data:
-            self.data['_meta']['field_prompt'] = self.old_data['field_prompt']
-        elif '_meta' in self.old_data and isinstance(self.old_data['_meta'], dict) and 'field_prompt' in self.old_data['_meta']:
-            self.data['_meta']['field_prompt'] = self.old_data['_meta']['field_prompt']
+        # Only update basic _meta fields if we have new data or are creating for the first time
+        if len(self.new_raw_data) > 0 or '_meta' not in self.old_data:
+            # Update name (always set to current mod name)
+            self.data['_meta']['name'] = self.name
+            
+            # Preserve field_prompt if it exists in old data
+            if 'field_prompt' in self.old_data:
+                self.data['_meta']['field_prompt'] = self.old_data['field_prompt']
+            elif '_meta' not in self.old_data or 'field_prompt' not in self.data['_meta']:
+                # Don't override existing field_prompt if it exists in _meta
+                pass
+        else:
+            # Data acquisition failed, keep existing _meta as-is
+            self.logger.info(f"Data acquisition failed for mod {self.id}, preserving existing _meta fields")
+        
+        # If data acquisition failed (no new raw data), preserve all existing data
+        if len(self.new_raw_data) == 0:
+            self.logger.warning(f"No new raw data for mod {self.id}, preserving all existing data")
+            # Copy all existing data (except what we've already handled in _meta)
+            for key in self.old_data:
+                if key not in ['name', 'field_prompt'] and key not in self.data:
+                    self.data[key] = self.old_data[key]
+                    self.logger.debug(f"Preserved existing key '{key}' due to data acquisition failure")
+            return  # Skip all processing since we have no new data
         
         # Process each key from raw data
         for key, new_value in self.new_raw_data.items():
