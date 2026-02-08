@@ -123,8 +123,35 @@ class CSV_File:
             
             # Perform round-trip comparison for keys with 'new' field
             self._remove_identical_new_values(file_path)
+            
+            # Apply TOML section reordering to ensure _meta is at the front
+            self._reorder_toml_sections(file_path)
+            
         except Exception as e:
             self.logger.error(f"Error saving data to {file_path}: {e}")
+    
+    def _reorder_toml_sections(self, file_path: str) -> None:
+        """
+        重新排序TOML文件，确保_meta section在最前面
+        """
+        try:
+            from .reorder import reorder_toml_sections
+            
+            # 读取文件内容
+            with open(file_path, 'r', encoding='utf-8') as file:
+                toml_content = file.read()
+            
+            # 重新排序
+            reordered_content = reorder_toml_sections(toml_content)
+            
+            # 如果内容有变化，重新写入文件
+            if reordered_content != toml_content:
+                with open(file_path, 'w', encoding='utf-8') as file:
+                    file.write(reordered_content)
+                self.logger.info(f"Reordered TOML sections in {file_path} (_meta sections moved to front)")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to reorder TOML sections in {file_path}: {e}")
     
     def _remove_identical_new_values(self, file_path: str) -> None:
         """
