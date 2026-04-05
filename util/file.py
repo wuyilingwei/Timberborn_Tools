@@ -55,11 +55,13 @@ class CSV_File:
         self.load_raw(raw)
 
     def is_valid_key(self, key: str) -> bool:
-        """Validate if key contains only legal characters: A-Z, a-z, and ."""
+        """Validate if key contains only legal characters: A-Z, a-z, 0-9, _ and ."""
         if not key or not isinstance(key, str):
             return False
-        # Only allow A-Z, a-z, and . characters
-        return bool(re.match(r'^[A-Za-z.]+$', key))
+        # Allow A-Z, a-z, 0-9, underscore and . characters
+        # Underscore and digits are used in real Timberborn keys, e.g. LV.MT.State_Open,
+        # Building.NaturalOverhang1.Description, Knatte.Pillar_1.DisplayName
+        return bool(re.match(r'^[A-Za-z0-9._]+$', key))
 
     def load_raw(self, path: str) -> None:
         """Load raw CSV file from mod"""
