@@ -65,6 +65,9 @@ def search_file(path: str, versions: list[str], keyword = "en") -> dict[str, str
     if not is_mult_version:
         logger.debug(f"Searching for {keyword} in {path}")
         result["default"] = search_helper(path, keyword)
+    for version in list(result.keys()):
+        if result[version] is None:
+            del result[version]
     if len(result) == 0:
         logger.error(f"ERROR: {path} not found")
         return None

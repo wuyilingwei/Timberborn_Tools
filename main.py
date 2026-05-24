@@ -1,5 +1,5 @@
 """
-version: 3.1.0
+version: 3.2.0
 author: Wuyilingwei
 Main script for the mod data update tool
 Focus: Fetch new mods, download them, and update TOML data files
@@ -22,73 +22,67 @@ from util.helper import *
 from util.git import *
 from util.mod_target import ModTarget
 from util.reorder import batch_download_with_delay
+import argparse
 import logging
 import os
 import time
 
-# Step 1: Initialize paths and configuration
-workpath = os.getcwd()
-config = Config(os.path.join(workpath, "config.toml"))
-game_mod_path = os.path.join(workpath, "steamcmd", "steamapps", "workshop", "content", str(config["workshop"]["game_id"]))
 
-# Setup git paths
-git_path = os.path.join(workpath, "git")
-if not os.path.exists(git_path):
-    os.makedirs(git_path)
-if config["git"]["enabled"]:
-    git = Git(git_path, config["git"]["branch"])
-data_path = os.path.join(git_path, "data")
-if not os.path.exists(data_path):
-    os.makedirs(data_path)
+def parse_args():
+    parser = argparse.ArgumentParser(description="Timberborn Mod Data Update Tool")
+    parser.add_argument("--skip-fetch", action="store_true",
+                        help="Skip Step 1: fetching new mods from Steam Workshop")
+    parser.add_argument("--skip-download", action="store_true",
+                        help="Skip Step 2: downloading mods via SteamCMD")
+    parser.add_argument("--start-from", type=int, choices=[1, 2, 3, 4, 5, 6], default=0,
+                        help="Start from a specific step (1-6). Implies skipping prior steps.")
+    parser.add_argument("--batch-size", type=int, default=5,
+                        help="Number of mods per batch download (default: 5)")
+    parser.add_argument("--batch-delay", type=int, default=5,
+                        help="Minutes to wait between batch downloads (default: 5)")
+    return parser.parse_args()
 
-# Step 2: Setup logger
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
 
-file_handler = logging.FileHandler(config["common"]["logPath"], encoding='utf-8')
-file_handler.setLevel(config["common"]["fileLevel"])
-file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-file_handler.setFormatter(file_formatter)
+def skip_step(step_num, args):
+    if args.start_from > step_num:
+        return True
+    if step_num == 1 and args.skip_fetch:
+        return True
+    if step_num == 2 and args.skip_download:
+        return True
+    return False
 
-console_handler = logging.StreamHandler()
-console_handler.setLevel(config["common"]["consoleLevel"])
-console_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-console_handler.setFormatter(console_formatter)
 
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
+CONFIG_CHANGED = False
 
-logger.info("=" * 80)
-logger.info("Timberborn Mod Data Update Tool v3.1")
-logger.info("Single-version tracking with old version key merging")
-logger.info("=" * 80)
 
-# Pull data repository if git enabled
-if config["git"]["enabled"]:
-    logger.info("Step 0: Pulling data repository...")
-    git.pull()
+def main():
+    args = parse_args()
+    global CONFIG_CHANGED
 
-# Fetch new mods from Steam Workshop
-logger.info("Step 1: Fetching latest mods from Steam Workshop...")
-workshop = WorkshopNewMods(config["workshop"]["game_id"], config["workshop"]["text"])
-new_mods = workshop.get_mods(config["workshop"]["depth"])
+    # Step 0: Initialize paths and configuration
+    workpath = os.getcwd()
+    config = Config(os.path.join(workpath, "config.toml"))
+    game_mod_path = os.path.join(workpath, "steamcmd", "steamapps", "workshop", "content", str(config["workshop"]["game_id"]))
 
-# Combine new mods with existing ones
-new_mod_count = 0
-for mod_id in new_mods:
-    if mod_id not in config["workshop"]["ids"]:
-        config["workshop"]["ids"].append(mod_id)
-        new_mod_count += 1
-        logger.info(f"New mod found: {mod_id}")
-logger.info(f"Found {new_mod_count} new mods")
+    # Setup git paths
+    git_path = os.path.join(workpath, "git")
+    if not os.path.exists(git_path):
+        os.makedirs(git_path)
+    if config["git"]["enabled"]:
+        git = Git(git_path, config["git"]["branch"])
+    data_path = os.path.join(git_path, "data")
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
 
-# Remove blacklisted mods
-for black_id in config["workshop"]["blacklist_ids"]:
-    if black_id in config["workshop"]["ids"]:
-        config["workshop"]["ids"].remove(black_id)
-        logger.info(f"Mod {black_id} is blacklisted and removed from the list")
+    # Setup logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
 
-logger.info(f"Total mods to process: {len(config['workshop']['ids'])}")
+    file_handler = logging.FileHandler(config["common"]["logPath"], encoding='utf-8')
+    file_handler.setLevel(config["common"]["fileLevel"])
+    file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    file_handler.setFormatter(file_formatter)
 
 # Download mods using steamcmd with batch processing
 logger.info("Step 2: Downloading mods using SteamCMD (batch mode)...")
@@ -102,80 +96,173 @@ batch_download_with_delay(
     delay_minutes=5
 )
 
-# Create ModTarget instances for each mod
-logger.info("Step 3: Creating mod targets...")
-mod_targets = {}
-valid_mod_ids = []
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
 
-for id in config["workshop"]["ids"]:
-    mod_path = os.path.join(game_mod_path, id)
-    mod_name = parse_mod_info(os.path.join(mod_path, "workshop_data.json"))
-    versions = search_versions(mod_path)
-    support_versions = search_file(mod_path, versions, keyword="en")
+    logger.info("=" * 80)
+    logger.info("Timberborn Mod Data Update Tool v3.2")
+    logger.info(f"CLI args: fetch={not skip_step(1, args)}, download={not skip_step(2, args)}, "
+                f"start_from={args.start_from or 'N/A'}")
+    logger.info("Single-version tracking with old version key merging")
+    logger.info("=" * 80)
 
-    if support_versions == {} or support_versions is None:
-        logger.warning(f"Mod {id} cannot find any translation files")
-        continue
-    
-    # Create ModTarget instance (no translator needed in v3)
-    mod_target = ModTarget(
-        mod_id=id,
-        mod_name=mod_name,
-        mod_path=mod_path
-    )
-    
-    # Add all versions to the ModTarget
-    for support_version, raw_file_path in support_versions.items():
-        if mod_target.add_version(support_version, raw_file_path):
-            logger.info(f"Added version {support_version} for mod {id}")
-    
-    if mod_target.has_valid_versions():
-        mod_targets[id] = mod_target
-        valid_mod_ids.append(id)
+    # Pull data repository if git enabled
+    if config["git"]["enabled"]:
+        logger.info("Step 0: Pulling data repository...")
+        git.pull()
+
+    # Step 1: Fetch new mods from Steam Workshop
+    if skip_step(1, args):
+        logger.info("Step 1: SKIPPED (fetching new mods)")
     else:
-        logger.warning(f"Mod {id} has no valid versions")
+        logger.info("Step 1: Fetching latest mods from Steam Workshop...")
+        workshop = WorkshopNewMods(config["workshop"]["game_id"], config["workshop"]["text"])
+        new_mods = workshop.get_mods(config["workshop"]["depth"])
 
-# Update config with only valid mod IDs
-config["workshop"]["ids"] = valid_mod_ids
+        new_mod_count = 0
+        for mod_id in new_mods:
+            if mod_id not in config["workshop"]["ids"]:
+                config["workshop"]["ids"].append(mod_id)
+                new_mod_count += 1
+                logger.info(f"New mod found: {mod_id}")
+        logger.info(f"Found {new_mod_count} new mods")
+        if new_mod_count > 0:
+            CONFIG_CHANGED = True
 
-# Process each ModTarget to update data
-logger.info("Step 4: Updating TOML data files...")
-processed_count = 0
-error_count = 0
+    # Remove blacklisted mods
+    for black_id in config["workshop"]["blacklist_ids"]:
+        if black_id in config["workshop"]["ids"]:
+            config["workshop"]["ids"].remove(black_id)
+            logger.info(f"Mod {black_id} is blacklisted and removed from the list")
 
-for mod_id, mod_target in mod_targets.items():
-    try:
-        logger.info(f"Processing mod {mod_id}: {mod_target.mod_name}")
-        
-        # Load historical data (both single-file and multi-version formats for migration)
-        mod_target.load_old_data(data_path)
-        
-        # Update data with change detection (uses latest version, merges old unique keys)
-        mod_target.update_all_data()
-        
-        # Save single version data (without version suffix)
-        mod_target.save_all_data(data_path)
-        
-        processed_count += 1
-    except Exception as e:
-        logger.error(f"Error processing mod {mod_id}: {e}")
-        error_count += 1
+    logger.info(f"Total mods to process: {len(config['workshop']['ids'])}")
 
-# Save configuration
-logger.info("Step 5: Saving configuration...")
-config.save_config()
+    # Step 2: Download mods using steamcmd with batch processing
+    if skip_step(2, args):
+        logger.info("Step 2: SKIPPED (downloading mods)")
+    else:
+        logger.info("Step 2: Downloading mods using SteamCMD (batch mode)...")
+        steamClient = steamdownloader(config["steam"]["username"], os.path.join(workpath, "steamcmd"))
 
-# Push data repository if git enabled
-if config["git"]["enabled"]:
-    logger.info("Step 6: Pushing updated data to repository...")
-    git.pull()  # Pull first to avoid conflicts
-    git.push()
+        # Filter out already-downloaded mods
+        ids_to_download = []
+        for mod_id in config["workshop"]["ids"]:
+            mod_path = os.path.join(game_mod_path, mod_id)
+            ws_json = os.path.join(mod_path, "workshop_data.json")
+            en_csv = os.path.join(mod_path, "Localizations", "enUS.csv")
+            if os.path.exists(ws_json) or os.path.exists(en_csv):
+                logger.debug(f"Mod {mod_id} already downloaded, skipping")
+            else:
+                ids_to_download.append(mod_id)
 
-# Summary
-logger.info("=" * 80)
-logger.info("Processing complete!")
-logger.info(f"Mods processed: {processed_count}")
-logger.info(f"Errors: {error_count}")
-logger.info(f"Data files saved to: {data_path}")
-logger.info("Next: Cloud workflow will handle translation and publishing")
-logger.info("=" * 80)
+        if ids_to_download:
+            logger.info(f"Need to download {len(ids_to_download)} mods "
+                        f"(out of {len(config['workshop']['ids'])} total)")
+            batch_download_with_delay(
+                steamClient,
+                config["workshop"]["game_id"],
+                ids_to_download,
+                batch_size=args.batch_size,
+                delay_minutes=args.batch_delay
+            )
+        else:
+            logger.info("All mods already downloaded, nothing to do")
+
+    # Step 3: Create ModTarget instances for each mod
+    logger.info("Step 3: Creating mod targets...")
+    mod_targets = {}
+    valid_mod_ids = []
+    total_ids = len(config["workshop"]["ids"])
+
+    for idx, id in enumerate(config["workshop"]["ids"]):
+        try:
+            if idx % 50 == 0:
+                logger.info(f"Step 3 progress: {idx}/{total_ids}")
+            mod_path = os.path.join(game_mod_path, id)
+
+            # Skip mods that don't exist on disk (never downloaded)
+            if not os.path.exists(mod_path):
+                logger.warning(f"Mod {id} directory not found, skipping")
+                continue
+
+            mod_name = parse_mod_info(os.path.join(mod_path, "workshop_data.json"))
+            versions = search_versions(mod_path)
+            if not versions:
+                logger.warning(f"Mod {id} has no version subdirectories, skipping")
+                continue
+            support_versions = search_file(mod_path, versions, keyword="en")
+
+            if support_versions is None or not support_versions:
+                logger.warning(f"Mod {id} cannot find any translation files")
+                continue
+
+            mod_target = ModTarget(
+                mod_id=id,
+                mod_name=mod_name,
+                mod_path=mod_path
+            )
+
+            for support_version, raw_file_path in support_versions.items():
+                if raw_file_path is None:
+                    continue
+                if mod_target.add_version(support_version, raw_file_path):
+                    logger.info(f"Added version {support_version} for mod {id}")
+
+            if mod_target.has_valid_versions():
+                mod_targets[id] = mod_target
+                valid_mod_ids.append(id)
+            else:
+                logger.warning(f"Mod {id} has no valid versions")
+        except Exception as e:
+            logger.error(f"Error creating mod target for mod {id}: {e}")
+
+    logger.info(f"Step 3 complete: {len(valid_mod_ids)}/{total_ids} mods loaded")
+
+    # Update config with only valid mod IDs
+    config["workshop"]["ids"] = valid_mod_ids
+
+    # Step 4: Process each ModTarget to update data
+    logger.info("Step 4: Updating TOML data files...")
+    processed_count = 0
+    error_count = 0
+    step4_total = len(mod_targets)
+
+    for idx, (mod_id, mod_target) in enumerate(mod_targets.items()):
+        try:
+            if idx % 20 == 0:
+                logger.info(f"Step 4 progress: {idx}/{step4_total}")
+            logger.info(f"Processing mod {mod_id}: {mod_target.mod_name}")
+
+            mod_target.load_old_data(data_path)
+            mod_target.update_all_data()
+            mod_target.save_all_data(data_path)
+
+            processed_count += 1
+        except Exception as e:
+            logger.error(f"Error processing mod {mod_id}: {e}")
+            error_count += 1
+
+    logger.info(f"Step 4 complete: {processed_count} processed, {error_count} errors")
+
+    # Step 5: Save configuration
+    logger.info("Step 5: Saving configuration...")
+    config.save_config()
+
+    # Step 6: Push data repository if git enabled
+    if config["git"]["enabled"]:
+        logger.info("Step 6: Pushing updated data to repository...")
+        git.pull()
+        git.push()
+
+    # Summary
+    logger.info("=" * 80)
+    logger.info("Processing complete!")
+    logger.info(f"Mods processed: {processed_count}")
+    logger.info(f"Errors: {error_count}")
+    logger.info(f"Data files saved to: {data_path}")
+    logger.info("Next: Cloud workflow will handle translation and publishing")
+    logger.info("=" * 80)
+
+
+if __name__ == "__main__":
+    main()
