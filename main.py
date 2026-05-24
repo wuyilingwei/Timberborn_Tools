@@ -84,17 +84,10 @@ def main():
     file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(file_formatter)
 
-# Download mods using steamcmd with batch processing
-logger.info("Step 2: Downloading mods using SteamCMD (batch mode)...")
-steamClient = steamdownloader(config["steam"]["username"], os.path.join(workpath, "steamcmd"))
-# 分批下载：每批5个，间隔5分钟，防止下载失败
-batch_download_with_delay(
-    steamClient, 
-    config["workshop"]["game_id"], 
-    config["workshop"]["ids"],
-    batch_size=5,
-    delay_minutes=5
-)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(config["common"]["consoleLevel"])
+    console_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    console_handler.setFormatter(console_formatter)
 
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
