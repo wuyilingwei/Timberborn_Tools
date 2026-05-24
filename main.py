@@ -21,8 +21,10 @@ from util.steamcmd import *
 from util.helper import *
 from util.git import *
 from util.mod_target import ModTarget
+from util.reorder import batch_download_with_delay
 import logging
 import os
+import time
 
 # Step 1: Initialize paths and configuration
 workpath = os.getcwd()
@@ -88,10 +90,17 @@ for black_id in config["workshop"]["blacklist_ids"]:
 
 logger.info(f"Total mods to process: {len(config['workshop']['ids'])}")
 
-# Download mods using steamcmd
-logger.info("Step 2: Downloading mods using SteamCMD...")
+# Download mods using steamcmd with batch processing
+logger.info("Step 2: Downloading mods using SteamCMD (batch mode)...")
 steamClient = steamdownloader(config["steam"]["username"], os.path.join(workpath, "steamcmd"))
-steamClient.download(config["workshop"]["game_id"], config["workshop"]["ids"])
+# 分批下载：每批5个，间隔5分钟，防止下载失败
+batch_download_with_delay(
+    steamClient, 
+    config["workshop"]["game_id"], 
+    config["workshop"]["ids"],
+    batch_size=5,
+    delay_minutes=5
+)
 
 # Create ModTarget instances for each mod
 logger.info("Step 3: Creating mod targets...")
@@ -101,7 +110,8 @@ valid_mod_ids = []
 for id in config["workshop"]["ids"]:
     mod_path = os.path.join(game_mod_path, id)
     mod_name = parse_mod_info(os.path.join(mod_path, "workshop_data.json"))
-    support_versions = search_versions(mod_path)
+    versions = search_versions(mod_path)
+    support_versions = search_file(mod_path, versions, keyword="en")
 
     if support_versions == {} or support_versions is None:
         logger.warning(f"Mod {id} cannot find any translation files")

@@ -77,7 +77,9 @@ class ModTarget:
                     self.old_version_data['single'] = toml.load(f, _dict=OrderedDict)
                 logger.info(f"Loaded old single-file data for {self.mod_id}")
             except Exception as e:
-                logger.error(f"Error loading old single-file data: {e}")
+                msg = f"Failed to load old single-file data for {self.mod_id} from {old_data_file}: {e}"
+                logger.error(msg)
+                raise RuntimeError(msg)
         
         # Also load old multi-version format files for migration
         for version in self.versions:
@@ -88,7 +90,9 @@ class ModTarget:
                         self.old_version_data[version] = toml.load(f, _dict=OrderedDict)
                     logger.info(f"Loaded old data for {self.mod_id} version {version}")
                 except Exception as e:
-                    logger.error(f"Error loading old data for version {version}: {e}")
+                    msg = f"Failed to load old data for {self.mod_id} version {version} from {old_data_file}: {e}"
+                    logger.error(msg)
+                    raise RuntimeError(msg)
     
     def update_all_data(self):
         """更新数据：只使用最新版本，合并旧版本的独立键值对"""
@@ -148,8 +152,19 @@ class ModTarget:
                 added_count = 0
                 
                 for key, value in old_data.items():
-                    # Skip meta fields
+                    # Skip meta fields (both old and new format) except for _meta itself
                     if key in ['name', 'field_prompt']:
+                        continue
+                    
+                    # Handle _meta fields specially - merge subfields
+                    if key == '_meta' and isinstance(value, dict):
+                        if '_meta' not in merged:
+                            merged['_meta'] = OrderedDict()
+                        # Merge _meta subfields, but don't override name and field_prompt
+                        for meta_key, meta_value in value.items():
+                            if meta_key not in ['name', 'field_prompt'] and meta_key not in merged['_meta']:
+                                merged['_meta'][meta_key] = meta_value
+                                added_count += 1
                         continue
                     
                     # Only add if key doesn't exist in merged data

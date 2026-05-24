@@ -11,6 +11,7 @@ import os
 import csv
 import toml
 import logging
+import re
 from collections import OrderedDict
 
 
@@ -53,6 +54,15 @@ class CSV_File:
         self.new_raw_data = {}
         self.load_raw(raw)
 
+    def is_valid_key(self, key: str) -> bool:
+        """Validate if key contains only legal characters: A-Z, a-z, 0-9, _ and ."""
+        if not key or not isinstance(key, str):
+            return False
+        # Allow A-Z, a-z, 0-9, underscore and . characters
+        # Underscore and digits are used in real Timberborn keys, e.g. LV.MT.State_Open,
+        # Building.NaturalOverhang1.Description, Knatte.Pillar_1.DisplayName
+        return bool(re.match(r'^[A-Za-z0-9._]+$', key))
+
     def load_raw(self, path: str) -> None:
         """Load raw CSV file from mod"""
         try:
@@ -70,6 +80,15 @@ class CSV_File:
                         continue
                     # Skip comment rows based on the Comment column
                     if len(row) > 2 and row[2].strip().lower() == 'comment':
+                        continue
+                    # Skip keys containing '//' as they are used as separators
+                    # Note: This checks for '//' anywhere in the key string
+                    if '//' in key:
+                        self.logger.debug(f"Skipping key '{key}' containing '//' (separator)")
+                        continue
+                    # Skip keys with invalid characters (only allow A-Z, a-z, and .)
+                    if not self.is_valid_key(key):
+                        self.logger.debug(f"Skipping key '{key}' with invalid characters (only A-Z, a-z, . allowed)")
                         continue
                     if len(row) > 1:
                         values = row[1:]
@@ -103,29 +122,117 @@ class CSV_File:
             with open(file_path, 'w', encoding='utf-8') as file:
                 toml.dump(self.data, file)
             self.logger.info(f"Saved data to {file_path}")
+            
+            # Perform round-trip comparison for keys with 'new' field
+            self._remove_identical_new_values(file_path)
+            
+            # Apply TOML section reordering to ensure _meta is at the front
+            self._reorder_toml_sections(file_path)
+            
         except Exception as e:
             self.logger.error(f"Error saving data to {file_path}: {e}")
+    
+    def _reorder_toml_sections(self, file_path: str) -> None:
+        """
+        重新排序TOML文件，确保_meta section在最前面
+        """
+        try:
+            from .reorder import reorder_toml_sections
+            
+            # 读取文件内容
+            with open(file_path, 'r', encoding='utf-8') as file:
+                toml_content = file.read()
+            
+            # 重新排序
+            reordered_content = reorder_toml_sections(toml_content)
+            
+            # 如果内容有变化，重新写入文件
+            if reordered_content != toml_content:
+                with open(file_path, 'w', encoding='utf-8') as file:
+                    file.write(reordered_content)
+                self.logger.info(f"Reordered TOML sections in {file_path} (_meta sections moved to front)")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to reorder TOML sections in {file_path}: {e}")
+    
+    def _remove_identical_new_values(self, file_path: str) -> None:
+        """
+        Read back the saved TOML file and compare 'new' and 'raw' values.
+        If they are identical after TOML round-trip, remove the 'new' field.
+        """
+        try:
+            # Read back the file
+            with open(file_path, 'r', encoding='utf-8') as file:
+                saved_data = toml.load(file, _dict=OrderedDict)
+            
+            modified = False
+            for key in saved_data:
+                if key == '_meta':
+                    continue
+                entry = saved_data[key]
+                if isinstance(entry, dict) and 'new' in entry and 'raw' in entry:
+                    # Compare after round-trip
+                    if entry['new'] == entry['raw']:
+                        del entry['new']
+                        modified = True
+                        self.logger.info(f"Removed 'new' field for key '{key}': identical to 'raw' after TOML round-trip")
+            
+            # Save back if modified
+            if modified:
+                with open(file_path, 'w', encoding='utf-8') as file:
+                    toml.dump(saved_data, file)
+                self.logger.info(f"Updated {file_path} after round-trip comparison")
+        except Exception as e:
+            self.logger.error(f"Error in round-trip comparison for {file_path}: {e}")
 
     def update_data(self) -> None:
         """
         Update data according to v3 requirements:
-        - Add/update 'name' field with mod name
+        - Add/update '_meta' section with 'name' and 'field_prompt' fields, preserve other _meta subfields
         - For new keys: create with 'new' field only
         - For existing keys with changed raw: add 'new' field alongside existing data
         - For unchanged keys: keep as-is
-        - Preserve 'prompt' and 'field_prompt' fields
+        - Preserve 'prompt' fields in individual entries
+        - If data acquisition fails (empty new_raw_data), preserve existing _meta completely
         """
         self.data = OrderedDict()
         
-        # Always update name field to current mod name
-        self.data['name'] = self.name
+        # Handle _meta section for metadata
+        if '_meta' in self.old_data and isinstance(self.old_data['_meta'], dict):
+            # Start with existing _meta data to preserve all subfields
+            self.data['_meta'] = OrderedDict(self.old_data['_meta'])
+        else:
+            # Create new _meta section if it doesn't exist
+            self.data['_meta'] = OrderedDict()
         
-        # Preserve field_prompt if it exists
-        if 'field_prompt' in self.old_data:
-            self.data['field_prompt'] = self.old_data['field_prompt']
+        # Only update basic _meta fields if we have new data or are creating for the first time
+        if len(self.new_raw_data) > 0 or '_meta' not in self.old_data:
+            # Update name (always set to current mod name)
+            self.data['_meta']['name'] = self.name
+            
+            # Preserve field_prompt if it exists in old data
+            if 'field_prompt' in self.old_data:
+                self.data['_meta']['field_prompt'] = self.old_data['field_prompt']
+            elif '_meta' not in self.old_data or 'field_prompt' not in self.data['_meta']:
+                # Don't override existing field_prompt if it exists in _meta
+                pass
+        else:
+            # Data acquisition failed, keep existing _meta as-is
+            self.logger.info(f"Data acquisition failed for mod {self.id}, preserving existing _meta fields")
+        
+        # If data acquisition failed (no new raw data), preserve all existing data
+        if len(self.new_raw_data) == 0:
+            self.logger.warning(f"No new raw data for mod {self.id}, preserving all existing data")
+            # Copy all existing data (except what we've already handled in _meta)
+            for key in self.old_data:
+                if key not in ['name', 'field_prompt'] and key not in self.data:
+                    self.data[key] = self.old_data[key]
+                    self.logger.debug(f"Preserved existing key '{key}' due to data acquisition failure")
+            return  # Skip all processing since we have no new data
         
         # Process each key from raw data
         for key, new_value in self.new_raw_data.items():
+            # Check both regular key and _meta section for existing data
             if key in self.old_data and isinstance(self.old_data[key], dict):
                 # Key exists in old data
                 old_entry = self.old_data[key]
@@ -169,7 +276,7 @@ class CSV_File:
         # Preserve keys from old data that are not in new raw data
         # Set status field based on whether key was from older version
         for key in self.old_data:
-            if key not in ['name', 'field_prompt'] and key not in self.data:
+            if key not in ['name', 'field_prompt', '_meta'] and key not in self.data:
                 old_entry = self.old_data[key]
                 if isinstance(old_entry, dict):
                     # Check if this key already has status "old" (from older version)

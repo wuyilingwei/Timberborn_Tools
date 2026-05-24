@@ -4,3 +4,4 @@ config.toml
 /__pycache__
 /git
 test*.*
+log.txt
