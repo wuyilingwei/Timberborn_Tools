@@ -65,6 +65,9 @@ class CSV_File:
 
     def load_raw(self, path: str) -> None:
         """Load raw CSV file from mod"""
+        if path is None:
+            self.logger.error("Cannot load raw data: path is None")
+            return
         try:
             with open(path, 'r', encoding='utf-8') as file:
                 first_line = file.readline()
